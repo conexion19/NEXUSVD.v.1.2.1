@@ -42,7 +42,7 @@ end
 
 -- ===================== TRACK OBJETOS =====================
 local trackedObjects = {}
-local function trackObject(obj)
+local function trackObject(obj)  
     local n = obj.Name:lower()
     if n:find("generator") then trackedObjects[obj] = "Generators"
     elseif n:find("pallet") then trackedObjects[obj] = "Pallets"
