@@ -1,60 +1,650 @@
--- Movement Module - All movement functions
-local Nexus = _G.Nexus
+-- Movement.lua - Модуль для функций движения
+local Nexus = require(script.Parent.NexusMain)
 
-local Movement = {
-    Connections = {},
-    InfiniteLunge = {
-        enabled = false,
-        speed = 50,
-        isLunging = false,
-        connection = nil
-    },
-    WalkSpeed = {
-        enabled = false,
-        speed = 16,
-        connection = nil
-    },
-    NoClip = {
-        enabled = false,
-        connection = nil,
-        originalCollisions = {}
-    },
-    Fly = {
-        enabled = false,
-        speed = 50,
-        bodyVelocity = nil,
-        bodyGyro = nil,
-        connection = nil
-    },
-    FreeCamera = {
-        enabled = false,
-        speed = 50,
-        connection = nil,
-        originalCameraType = nil,
-        originalCameraSubject = nil,
-        mouseLocked = false
-    },
-    FOV = {
-        enabled = false,
-        value = 95,
-        targetValue = 95,
-        currentTween = nil,
-        tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local MovementModule = {}
+
+function MovementModule.Initialize(nexus)
+    local Tabs = nexus.Tabs
+    local Options = nexus.Options
+    local SafeCallback = nexus.SafeCallback
+    
+    local player = nexus.Player
+    local UserInputService = nexus.Services.UserInputService
+    local RunService = nexus.Services.RunService
+    local Workspace = nexus.Services.Workspace
+    local TweenService = nexus.Services.TweenService
+    local camera = nexus.Camera
+    
+    -- ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+    local function getCharacter()
+        return player.Character
+    end
+    
+    local function getHumanoid()
+        local char = getCharacter()
+        return char and char:FindFirstChildOfClass("Humanoid")
+    end
+    
+    local function getRootPart()
+        local char = getCharacter()
+        return char and char:FindFirstChild("HumanoidRootPart")
+    end
+    
+    -- ========== TELEPORT ФУНКЦИИ ==========
+    local function findRootForDesc(desc)
+        if not desc then return nil end
+        if desc:IsA("BasePart") or desc:IsA("MeshPart") then
+            return desc
+        end
+        if desc:IsA("Model") then
+            return desc.PrimaryPart or desc:FindFirstChildWhichIsA("BasePart") or desc:FindFirstChildWhichIsA("MeshPart")
+        end
+        return nil
+    end
+
+    local generatorNames = {
+        ["generator"] = true,
+        ["generator_old"] = true,
+        ["gene"] = true
     }
-}
+    local hookNames = {
+        ["hookpoint"] = true,
+        ["hook"] = true,
+        ["hookmeat"] = true
+    }
 
-function Movement.Init(nxs)
-    Nexus = nxs
+    local generatorPrefix = "ge"
+    local hookPrefix = "ho"
+
+    local function collectGenerators()
+        local matches = {}
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Model") then
+                local nameLower = string.lower(obj.Name)
+                if generatorNames[nameLower] or string.sub(nameLower, 1, #generatorPrefix) == generatorPrefix then
+                    local root = findRootForDesc(obj) or obj
+                    if root and root.Parent then
+                        table.insert(matches, root)
+                    end
+                end
+            end
+        end
+        return matches
+    end
+
+    local function collectHooks()
+        local matches = {}
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Model") then
+                local nameLower = string.lower(obj.Name)
+                if hookNames[nameLower] or string.sub(nameLower, 1, #hookPrefix) == hookPrefix then
+                    local root = findRootForDesc(obj) or obj
+                    if root and root.Parent then
+                        table.insert(matches, root)
+                    end
+                end
+            end
+        end
+        return matches
+    end
+
+    local function collectPlayers()
+        local pool = {}
+        for _, pl in ipairs(game:GetService("Players"):GetPlayers()) do
+            if pl ~= player and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+                table.insert(pool, pl)
+            end
+        end
+        return pool
+    end
+
+    local function safeTeleportTo(part)
+        local char = player.Character
+        if not char or not part then return false end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return false end
+        
+        if not part or not part.Parent then return false end
+        
+        SafeCallback(function()
+            hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+        end)
+        return true
+    end
+
+    local function teleportToRandomGenerator()
+        local matches = collectGenerators()
+        if #matches > 0 then 
+            return safeTeleportTo(matches[math.random(1, #matches)])
+        end
+        return false
+    end
+
+    local function teleportToRandomHook()
+        local matches = collectHooks()
+        if #matches > 0 then 
+            return safeTeleportTo(matches[math.random(1, #matches)])
+        end
+        return false
+    end
+
+    local function teleportToRandomPlayer()
+        local pool = collectPlayers()
+        if #pool > 0 then
+            local target = pool[math.random(1, #pool)]
+            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then return safeTeleportTo(hrp) end
+        end
+        return false
+    end
+
+    local function teleportToNearestGenerator()
+        local matches = collectGenerators()
+        if #matches == 0 then return false end
+        
+        local char = player.Character
+        if not char then return false end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return false end
+        
+        local nearestGenerator = nil
+        local nearestDistance = math.huge
+        
+        for _, generator in ipairs(matches) do
+            local distance = (hrp.Position - generator.Position).Magnitude
+            if distance < nearestDistance then
+                nearestDistance = distance
+                nearestGenerator = generator
+            end
+        end
+        
+        if nearestGenerator then
+            return safeTeleportTo(nearestGenerator)
+        end
+        return false
+    end
+
+    local function teleportToNearestPlayer()
+        local pool = collectPlayers()
+        if #pool == 0 then return false end
+        
+        local char = player.Character
+        if not char then return false end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return false end
+        
+        local nearestPlayer = nil
+        local nearestDistance = math.huge
+        
+        for _, target in ipairs(pool) do
+            if target.Character then
+                local targetHrp = target.Character:FindFirstChild("HumanoidRootPart")
+                if targetHrp then
+                    local distance = (hrp.Position - targetHrp.Position).Magnitude
+                    if distance < nearestDistance then
+                        nearestDistance = distance
+                        nearestPlayer = target
+                    end
+                end
+            end
+        end
+        
+        if nearestPlayer and nearestPlayer.Character then
+            local targetHrp = nearestPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if targetHrp then
+                return safeTeleportTo(targetHrp)
+            end
+        end
+        return false
+    end
     
-    local Tabs = Nexus.Tabs
-    local Options = Nexus.Options
+    -- ========== WalkSpeed ФУНКЦИЯ ==========
+    local WalkSpeed = (function()
+        local WALKSPEED_ENABLED = false
+        local currentSpeed = 50
+        local speedConnection = nil
+        
+        local function EnableWalkSpeed()
+            if WALKSPEED_ENABLED then return end
+            
+            WALKSPEED_ENABLED = true
+            nexus.FunctionStates.WalkSpeedEnabled = true
+            
+            speedConnection = RunService.Heartbeat:Connect(function()
+                if not WALKSPEED_ENABLED or not player.Character then
+                    if speedConnection then
+                        speedConnection:Disconnect()
+                        speedConnection = nil
+                    end
+                    return
+                end
+                
+                local character = player.Character
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if not rootPart then return end
+                
+                local direction = Vector3.new(0, 0, 0)
+                local camera = Workspace.CurrentCamera
+                
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                    direction = direction + camera.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                    direction = direction - camera.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                    direction = direction - camera.CFrame.RightVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                    direction = direction + camera.CFrame.RightVector
+                end
+                
+                if direction.Magnitude > 0 then
+                    direction = direction.Unit
+                    local velocity = direction * currentSpeed
+                    rootPart.Velocity = Vector3.new(velocity.X, rootPart.Velocity.Y, velocity.Z)
+                end
+            end)
+        end
+        
+        local function DisableWalkSpeed()
+            if not WALKSPEED_ENABLED then return end
+            
+            WALKSPEED_ENABLED = false
+            nexus.FunctionStates.WalkSpeedEnabled = false
+            
+            if speedConnection then
+                SafeCallback(function() speedConnection:Disconnect() end)
+                speedConnection = nil
+            end
+        end
+        
+        local function SetSpeed(speed)
+            currentSpeed = tonumber(speed) or 50
+        end
+        
+        return {
+            Enable = EnableWalkSpeed,
+            Disable = DisableWalkSpeed,
+            SetSpeed = SetSpeed,
+            IsEnabled = function() return WALKSPEED_ENABLED end,
+            GetSpeed = function() return currentSpeed end
+        }
+    end)()
     
-    -- ========== TELEPORT BUTTONS ==========
+    -- ========== NoClip ФУНКЦИЯ ==========
+    local NoClip = (function()
+        local noclipEnabled = false
+        local noclipConnection = nil
+        local originalCollisions = {}
+
+        local function saveOriginalCollisions(character)
+            if not character then return end
+            
+            originalCollisions = {}
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then 
+                    originalCollisions[part] = part.CanCollide
+                end
+            end
+        end
+
+        local function restoreOriginalCollisions(character)
+            if not character then return end
+            
+            for part, canCollide in pairs(originalCollisions) do
+                if part and part.Parent then
+                    SafeCallback(function()
+                        part.CanCollide = canCollide
+                    end)
+                end
+            end
+            originalCollisions = {}
+        end
+
+        local function EnableNoClip()
+            if noclipEnabled then return end
+            noclipEnabled = true
+            nexus.FunctionStates.noclipEnabled = true
+            print("NoClip Enabled")
+            
+            local character = getCharacter()
+            if character then
+                saveOriginalCollisions(character)
+            end
+            
+            noclipConnection = RunService.Stepped:Connect(function()
+                if not noclipEnabled or not getCharacter() then 
+                    if noclipConnection then
+                        noclipConnection:Disconnect()
+                        noclipConnection = nil
+                    end
+                    return 
+                end
+                
+                local character = getCharacter()
+                if character then
+                    for _, part in ipairs(character:GetDescendants()) do
+                        if part:IsA("BasePart") then 
+                            SafeCallback(function()
+                                part.CanCollide = false
+                            end)
+                        end
+                    end
+                end
+            end)
+            
+            player.CharacterAdded:Connect(function(newChar)
+                if noclipEnabled then
+                    task.wait(1)
+                    saveOriginalCollisions(newChar)
+                    print("NoClip applied to new character")
+                end
+            end)
+        end
+
+        local function DisableNoClip()
+            if not noclipEnabled then return end
+            
+            noclipEnabled = false
+            nexus.FunctionStates.noclipEnabled = false
+            print("NoClip Disabled")
+            
+            if noclipConnection then
+                noclipConnection:Disconnect()
+                noclipConnection = nil
+            end
+            
+            local character = getCharacter()
+            if character then
+                restoreOriginalCollisions(character)
+            end
+        end
+
+        return {
+            Enable = EnableNoClip,
+            Disable = DisableNoClip,
+            IsEnabled = function() return noclipEnabled end
+        }
+    end)()
+    
+    -- ========== Infinite Lunge ФУНКЦИЯ ==========
+    local InfiniteLunge = (function()
+        local isLunging = false
+        local lungeSpeed = 50
+        local lungeConnection = nil
+        
+        local function EnableInfiniteLunge()
+            if nexus.FunctionStates.InfiniteLungeEnabled then return end
+            nexus.FunctionStates.InfiniteLungeEnabled = true
+            print("Infinite Lunge Enabled")
+        end
+        
+        local function DisableInfiniteLunge()
+            nexus.FunctionStates.InfiniteLungeEnabled = false
+            isLunging = false
+            
+            if lungeConnection then
+                lungeConnection:Disconnect()
+                lungeConnection = nil
+            end
+        end
+        
+        local function HandleInput(input, gameProcessed)
+            if gameProcessed or not nexus.FunctionStates.InfiniteLungeEnabled then
+                return
+            end
+            
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if input.UserInputState == Enum.UserInputState.Begin then
+                    isLunging = true
+                    print("Lunge started")
+                    if player.Character then
+                        if lungeConnection then
+                            lungeConnection:Disconnect()
+                        end
+                        
+                        lungeConnection = RunService.Heartbeat:Connect(function()
+                            if not nexus.FunctionStates.InfiniteLungeEnabled or not isLunging or not player.Character then
+                                if lungeConnection then
+                                    lungeConnection:Disconnect()
+                                    lungeConnection = nil
+                                end
+                                return
+                            end
+                            
+                            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+                            
+                            if rootPart then
+                                local lookVector = rootPart.CFrame.LookVector
+                                local velocity = lookVector * lungeSpeed
+                                
+                                rootPart.Velocity = Vector3.new(velocity.X, rootPart.Velocity.Y, velocity.Z)
+                            end
+                        end)
+                    end
+                    
+                elseif input.UserInputState == Enum.UserInputState.End then
+                    isLunging = false
+                    print("Lunge stopped")
+                    if lungeConnection then
+                        lungeConnection:Disconnect()
+                        lungeConnection = nil
+                    end
+                end
+            end
+        end
+        
+
+        local inputBeganConn = UserInputService.InputBegan:Connect(HandleInput)
+        local inputEndedConn = UserInputService.InputEnded:Connect(HandleInput)
+
+        nexus.Connections.InfiniteLungeBegan = inputBeganConn
+        nexus.Connections.InfiniteLungeEnded = inputEndedConn
+        
+        return {
+            Enable = EnableInfiniteLunge,
+            Disable = DisableInfiniteLunge,
+            SetSpeed = function(speed) 
+                lungeSpeed = speed 
+                print("Lunge speed set to: " .. speed)
+            end,
+            IsEnabled = function() return nexus.FunctionStates.InfiniteLungeEnabled end
+        }
+    end)()
+    
+    -- ========== FLY ФУНКЦИИ ==========
+    local flying = false
+    local flySpeed = 50
+    local bodyVelocity, bodyGyro = nil, nil
+
+    local function enableFly()
+        if flying then return end
+        flying = true
+        nexus.FunctionStates.FlyEnabled = true
+        
+        local character, humanoid, rootPart = getCharacter(), getHumanoid(), getRootPart()
+        if not character or not humanoid or not rootPart then return end
+        
+        humanoid.PlatformStand = true
+        bodyVelocity, bodyGyro = Instance.new("BodyVelocity"), Instance.new("BodyGyro")
+        bodyVelocity.Velocity, bodyVelocity.MaxForce, bodyVelocity.Parent = Vector3.new(0, 0, 0), Vector3.new(math.huge, math.huge, math.huge), rootPart
+        bodyGyro.MaxTorque, bodyGyro.P, bodyGyro.D, bodyGyro.CFrame, bodyGyro.Parent = Vector3.new(math.huge, math.huge, math.huge), 10000, 500, rootPart.CFrame, rootPart
+
+        nexus.Connections.flyLoop = RunService.Heartbeat:Connect(function()
+            if not flying or not bodyVelocity or not bodyGyro or not character or not humanoid or not rootPart then
+                if nexus.Connections.flyLoop then
+                    nexus.Connections.flyLoop:Disconnect()
+                    nexus.Connections.flyLoop = nil
+                end
+                return
+            end
+            
+            local camera, direction = Workspace.CurrentCamera, Vector3.new(0, 0, 0)
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction = direction + camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction = direction - camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction = direction - camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction = direction + camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction = direction + Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction = direction + Vector3.new(0, -1, 0) end
+
+            if direction.Magnitude > 0 then direction = direction.Unit * flySpeed end
+            if bodyVelocity then bodyVelocity.Velocity = direction end
+            if bodyGyro then bodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + camera.CFrame.LookVector) end
+        end)
+    end
+
+    local function disableFly()
+        if not flying then return end
+        flying = false
+        nexus.FunctionStates.FlyEnabled = false
+        if bodyVelocity then bodyVelocity:Destroy(); bodyVelocity = nil end
+        if bodyGyro then bodyGyro:Destroy(); bodyGyro = nil end
+        local character, humanoid = getCharacter(), getHumanoid()
+        if humanoid then humanoid.PlatformStand = false end
+        
+        if nexus.Connections.flyLoop then
+            nexus.Connections.flyLoop:Disconnect()
+            nexus.Connections.flyLoop = nil
+        end
+    end
+    
+    -- ========== FREE CAMERA ФУНКЦИИ ==========
+    local freeCameraEnabled = false
+    local freeCameraSpeed = 50
+    local freeCameraConnection = nil
+    local originalCameraType, originalCameraSubject, mouseLocked = camera.CameraType, camera.CameraSubject, false
+
+    local function lockMouse()
+        if not freeCameraEnabled then return end
+        mouseLocked = true
+        UserInputService.MouseBehavior, UserInputService.MouseIconEnabled = Enum.MouseBehavior.LockCenter, false
+    end
+
+    local function unlockMouse()
+        mouseLocked = false
+        UserInputService.MouseBehavior, UserInputService.MouseIconEnabled = Enum.MouseBehavior.Default, true
+    end
+
+    local function startFreeCamera()
+        if freeCameraEnabled then return end
+        freeCameraEnabled = true
+        nexus.FunctionStates.FreeCameraEnabled = true
+        originalCameraType, originalCameraSubject = camera.CameraType, camera.CameraSubject
+        camera.CameraType = Enum.CameraType.Scriptable
+        
+        local cameraPosition, cameraRotation = camera.CFrame.Position, Vector2.new(0, 0)
+        local lookVector = camera.CFrame.LookVector
+        cameraRotation = Vector2.new(math.atan2(lookVector.X, lookVector.Z), math.asin(lookVector.Y))
+        
+        lockMouse()
+        
+        if getCharacter() then
+            local humanoid, rootPart = getHumanoid(), getRootPart()
+            if humanoid then humanoid.PlatformStand, humanoid.AutoRotate = false, false end
+            if rootPart then rootPart.Anchored = true end
+        end
+        
+        freeCameraConnection = RunService.RenderStepped:Connect(function(delta)
+            if not freeCameraEnabled then 
+                if freeCameraConnection then
+                    freeCameraConnection:Disconnect()
+                    freeCameraConnection = nil
+                end
+                return 
+            end
+            
+            local mouseDelta = UserInputService:GetMouseDelta()
+            cameraRotation = cameraRotation + Vector2.new(-mouseDelta.X * 0.003, -mouseDelta.Y * 0.003)
+            cameraRotation = Vector2.new(cameraRotation.X, math.clamp(cameraRotation.Y, -math.pi/2 + 0.1, math.pi/2 - 0.1))
+            
+            local rotationCFrame = CFrame.Angles(0, cameraRotation.X, 0) * CFrame.Angles(cameraRotation.Y, 0, 0)
+            local moveDirection = Vector3.new(0, 0, 0)
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDirection = moveDirection + rotationCFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDirection = moveDirection - rotationCFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDirection = moveDirection - rotationCFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDirection = moveDirection + rotationCFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.E) or UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveDirection = moveDirection + Vector3.new(0, -1, 0) end
+            
+            if moveDirection.Magnitude > 0 then moveDirection = moveDirection.Unit * freeCameraSpeed; cameraPosition = cameraPosition + moveDirection * delta end
+            camera.CFrame = CFrame.new(cameraPosition) * rotationCFrame
+        end)
+    end
+
+    local function stopFreeCamera()
+        if not freeCameraEnabled then return end
+        freeCameraEnabled = false
+        nexus.FunctionStates.FreeCameraEnabled = false
+        unlockMouse()
+        
+        if freeCameraConnection then
+            freeCameraConnection:Disconnect()
+            freeCameraConnection = nil
+        end
+        
+        camera.CameraType, camera.CameraSubject = originalCameraType, originalCameraSubject
+        
+        if getCharacter() then
+            local humanoid, rootPart = getHumanoid(), getRootPart()
+            if humanoid then humanoid.PlatformStand, humanoid.AutoRotate = false, true end
+            if rootPart then rootPart.Anchored = false end
+        end
+    end
+    
+    -- ========== FOV CHANGER ==========
+    local FOVSettings = {
+        Enabled = false,
+        Value = 95,
+        TargetValue = 95,
+        TweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        CurrentTween = nil
+    }
+
+    local function ApplyFOV()
+        if camera and FOVSettings.Enabled then
+            FOVSettings.TargetValue = FOVSettings.Value
+            
+            if FOVSettings.CurrentTween then
+                FOVSettings.CurrentTween:Cancel()
+            end
+            
+            FOVSettings.CurrentTween = TweenService:Create(camera, FOVSettings.TweenInfo, {FieldOfView = FOVSettings.TargetValue})
+            FOVSettings.CurrentTween:Play()
+        elseif camera then
+            if FOVSettings.CurrentTween then
+                FOVSettings.CurrentTween:Cancel()
+                FOVSettings.CurrentTween = nil
+            end
+            camera.FieldOfView = 70
+        end
+    end
+
+    Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+        task.wait(0.1)
+        camera = Workspace.CurrentCamera
+        ApplyFOV()
+    end)
+
+    if RunService.RenderStepped then
+        nexus.Connections.FOVUpdater = RunService.RenderStepped:Connect(function()
+            if FOVSettings.Enabled and camera and math.abs(camera.FieldOfView - FOVSettings.TargetValue) > 0.1 then
+                ApplyFOV()
+            end
+        end)
+    end
+    
+    -- ========== СОЗДАНИЕ ЭЛЕМЕНТОВ ИНТЕРФЕЙСА ==========
+    
+    -- Телепортационные кнопки
     Tabs.Movement:AddButton({
         Title = "Teleport to Random Generator", 
         Description = "Teleport to a random generator on the map",
         Callback = function()
-            Nexus.SafeCallback(Movement.TeleportToRandomGenerator)
+            SafeCallback(function()
+                teleportToRandomGenerator()
+            end)
         end
     })
 
@@ -62,7 +652,9 @@ function Movement.Init(nxs)
         Title = "Teleport to Random Hook", 
         Description = "Teleport to a random hook on the map",
         Callback = function()
-            Nexus.SafeCallback(Movement.TeleportToRandomHook)
+            SafeCallback(function()
+                teleportToRandomHook()
+            end)
         end
     })
 
@@ -70,7 +662,9 @@ function Movement.Init(nxs)
         Title = "Teleport to Random Player", 
         Description = "Teleport to a random player on the map",
         Callback = function()
-            Nexus.SafeCallback(Movement.TeleportToRandomPlayer)
+            SafeCallback(function()
+                teleportToRandomPlayer()
+            end)
         end
     })
 
@@ -78,7 +672,9 @@ function Movement.Init(nxs)
         Title = "Teleport to Nearest Generator", 
         Description = "Teleport to the closest generator",
         Callback = function()
-            Nexus.SafeCallback(Movement.TeleportToNearestGenerator)
+            SafeCallback(function()
+                teleportToNearestGenerator()
+            end)
         end
     })
 
@@ -86,12 +682,14 @@ function Movement.Init(nxs)
         Title = "Teleport to Nearest Player", 
         Description = "Teleport to the closest player",
         Callback = function()
-            Nexus.SafeCallback(Movement.TeleportToNearestPlayer)
+            SafeCallback(function()
+                teleportToNearestPlayer()
+            end)
         end
     })
 
-    -- ========== INFINITE LUNGE ==========
-    if Nexus.IS_DESKTOP then
+    -- Infinite Lunge (только для десктопа)
+    if nexus.IS_DESKTOP then
         local InfiniteLungeToggle = Tabs.Movement:AddToggle("InfiniteLunge", {
             Title = "Infinite Lunge", 
             Description = "Hold LMB to lunge forward", 
@@ -99,11 +697,11 @@ function Movement.Init(nxs)
         })
 
         InfiniteLungeToggle:OnChanged(function(v) 
-            Nexus.SafeCallback(function()
+            SafeCallback(function()
                 if v then 
-                    Movement.EnableInfiniteLunge() 
+                    InfiniteLunge.Enable() 
                 else 
-                    Movement.DisableInfiniteLunge() 
+                    InfiniteLunge.Disable() 
                 end 
             end)
         end)
@@ -116,14 +714,14 @@ function Movement.Init(nxs)
             Max = 200, 
             Rounding = 0, 
             Callback = function(value) 
-                Nexus.SafeCallback(function()
-                    Movement.SetLungeSpeed(value)
+                SafeCallback(function()
+                    InfiniteLunge.SetSpeed(value)
                 end)
             end
         })
     end
 
-    -- ========== WALK SPEED ==========
+    -- Walk Speed
     local WalkSpeedToggle = Tabs.Movement:AddToggle("WalkSpeed", {
         Title = "Walk Speed", 
         Description = "", 
@@ -131,11 +729,11 @@ function Movement.Init(nxs)
     })
 
     WalkSpeedToggle:OnChanged(function(v) 
-        Nexus.SafeCallback(function()
+        SafeCallback(function()
             if v then 
-                Movement.EnableWalkSpeed() 
+                WalkSpeed.Enable() 
             else 
-                Movement.DisableWalkSpeed() 
+                WalkSpeed.Disable() 
             end 
         end)
     end)
@@ -148,13 +746,13 @@ function Movement.Init(nxs)
         Max = 200, 
         Rounding = 0, 
         Callback = function(value) 
-            Nexus.SafeCallback(function()
-                Movement.SetWalkSpeed(value)
+            SafeCallback(function()
+                WalkSpeed.SetSpeed(value)
             end)
         end
     })
 
-    -- ========== NOCLIP ==========
+    -- Noclip
     local NoclipToggle = Tabs.Movement:AddToggle("Noclip", {
         Title = "Noclip",
         Description = "",
@@ -162,16 +760,16 @@ function Movement.Init(nxs)
     })
 
     NoclipToggle:OnChanged(function(value)
-        Nexus.SafeCallback(function()
+        SafeCallback(function()
             if value then 
-                Movement.EnableNoClip() 
+                NoClip.Enable() 
             else 
-                Movement.DisableNoClip()
+                NoClip.Disable()
             end 
         end)
     end)
 
-    -- ========== FOV CHANGER ==========
+    -- FOV Changer
     local FOVToggle = Tabs.Movement:AddToggle("FOVChanger", {
         Title = "FOV Changer", 
         Description = "", 
@@ -179,8 +777,9 @@ function Movement.Init(nxs)
     })
 
     FOVToggle:OnChanged(function(v)
-        Nexus.SafeCallback(function()
-            Movement.ToggleFOV(v)
+        SafeCallback(function()
+            FOVSettings.Enabled = v
+            ApplyFOV()
         end)
     end)
 
@@ -192,14 +791,15 @@ function Movement.Init(nxs)
         Max = 120,
         Rounding = 0,
         Callback = function(value)
-            Nexus.SafeCallback(function()
-                Movement.SetFOV(value)
+            SafeCallback(function()
+                FOVSettings.Value = value
+                ApplyFOV()
             end)
         end
     })
 
-    -- ========== FLY ==========
-    if Nexus.IS_DESKTOP then
+    -- Fly (только для десктопа)
+    if nexus.IS_DESKTOP then
         local FlyToggle = Tabs.Movement:AddToggle("Fly", {
             Title = "Fly", 
             Description = "Allows flying in any direction", 
@@ -207,11 +807,11 @@ function Movement.Init(nxs)
         })
 
         FlyToggle:OnChanged(function(value) 
-            Nexus.SafeCallback(function()
+            SafeCallback(function()
                 if value then 
-                    Movement.EnableFly() 
+                    enableFly() 
                 else 
-                    Movement.DisableFly() 
+                    disableFly() 
                 end 
             end)
         end)
@@ -224,13 +824,13 @@ function Movement.Init(nxs)
             Max = 200, 
             Rounding = 0, 
             Callback = function(value) 
-                Nexus.SafeCallback(function()
-                    Movement.SetFlySpeed(value)
+                SafeCallback(function()
+                    flySpeed = value
                 end)
             end
         })
 
-        -- ========== FREE CAMERA ==========
+        -- Free Camera
         local FreeCameraToggle = Tabs.Movement:AddToggle("FreeCamera", {
             Title = "Free Camera", 
             Description = "", 
@@ -238,11 +838,11 @@ function Movement.Init(nxs)
         })
 
         FreeCameraToggle:OnChanged(function(value) 
-            Nexus.SafeCallback(function()
+            SafeCallback(function()
                 if value then 
-                    Movement.EnableFreeCamera() 
+                    startFreeCamera() 
                 else 
-                    Movement.DisableFreeCamera() 
+                    stopFreeCamera() 
                 end 
             end)
         end)
@@ -255,723 +855,25 @@ function Movement.Init(nxs)
             Max = 100, 
             Rounding = 0, 
             Callback = function(value) 
-                Nexus.SafeCallback(function()
-                    Movement.SetFreeCameraSpeed(value)
+                SafeCallback(function()
+                    freeCameraSpeed = value
                 end)
             end
         })
     end
-
-    print("✓ Movement module initialized")
+    
+    -- Сохраняем функции в Nexus
+    nexus.Functions.WalkSpeed = WalkSpeed
+    nexus.Functions.NoClip = NoClip
+    nexus.Functions.InfiniteLunge = InfiniteLunge
+    nexus.Functions.enableFly = enableFly
+    nexus.Functions.disableFly = disableFly
+    nexus.Functions.startFreeCamera = startFreeCamera
+    nexus.Functions.stopFreeCamera = stopFreeCamera
+    nexus.Functions.FOVSettings = FOVSettings
+    nexus.Functions.ApplyFOV = ApplyFOV
+    
+    return MovementModule
 end
 
--- ========== TELEPORT FUNCTIONS ==========
-
-function Movement.TeleportToRandomGenerator()
-    local matches = Movement.CollectGenerators()
-    if #matches > 0 then 
-        Movement.SafeTeleportTo(matches[math.random(1, #matches)])
-        Nexus.Fluent:Notify({
-            Title = "Teleport",
-            Content = "Teleported to random generator",
-            Duration = 2
-        })
-    end
-end
-
-function Movement.TeleportToRandomHook()
-    local matches = Movement.CollectHooks()
-    if #matches > 0 then 
-        Movement.SafeTeleportTo(matches[math.random(1, #matches)])
-        Nexus.Fluent:Notify({
-            Title = "Teleport",
-            Content = "Teleported to random hook",
-            Duration = 2
-        })
-    end
-end
-
-function Movement.TeleportToRandomPlayer()
-    local pool = Movement.CollectPlayers()
-    if #pool > 0 then
-        local target = pool[math.random(1, #pool)]
-        local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then 
-            Movement.SafeTeleportTo(hrp)
-            Nexus.Fluent:Notify({
-                Title = "Teleport",
-                Content = "Teleported to " .. target.Name,
-                Duration = 2
-            })
-        end
-    end
-end
-
-function Movement.TeleportToNearestGenerator()
-    local matches = Movement.CollectGenerators()
-    if #matches == 0 then return false end
-    
-    local character = Nexus.getCharacter()
-    if not character then return false end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    
-    local nearestGenerator = nil
-    local nearestDistance = math.huge
-    
-    for _, generator in ipairs(matches) do
-        local distance = (hrp.Position - generator.Position).Magnitude
-        if distance < nearestDistance then
-            nearestDistance = distance
-            nearestGenerator = generator
-        end
-    end
-    
-    if nearestGenerator then
-        Movement.SafeTeleportTo(nearestGenerator)
-        Nexus.Fluent:Notify({
-            Title = "Teleport",
-            Content = "Teleported to nearest generator",
-            Duration = 2
-        })
-        return true
-    end
-    return false
-end
-
-function Movement.TeleportToNearestPlayer()
-    local pool = Movement.CollectPlayers()
-    if #pool == 0 then return false end
-    
-    local character = Nexus.getCharacter()
-    if not character then return false end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    
-    local nearestPlayer = nil
-    local nearestDistance = math.huge
-    
-    for _, target in ipairs(pool) do
-        if target.Character then
-            local targetHrp = target.Character:FindFirstChild("HumanoidRootPart")
-            if targetHrp then
-                local distance = (hrp.Position - targetHrp.Position).Magnitude
-                if distance < nearestDistance then
-                    nearestDistance = distance
-                    nearestPlayer = target
-                end
-            end
-        end
-    end
-    
-    if nearestPlayer and nearestPlayer.Character then
-        local targetHrp = nearestPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if targetHrp then
-            Movement.SafeTeleportTo(targetHrp)
-            Nexus.Fluent:Notify({
-                Title = "Teleport",
-                Content = "Teleported to nearest player: " .. nearestPlayer.Name,
-                Duration = 2
-            })
-            return true
-        end
-    end
-    return false
-end
-
-function Movement.CollectGenerators()
-    local matches = {}
-    local generatorNames = {
-        ["generator"] = true,
-        ["generator_old"] = true,
-        ["gene"] = true
-    }
-    local generatorPrefix = "ge"
-    
-    for _, obj in ipairs(Nexus.Services.Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Model") then
-            local nameLower = string.lower(obj.Name)
-            if generatorNames[nameLower] or string.sub(nameLower, 1, #generatorPrefix) == generatorPrefix then
-                local root = Movement.FindRootForDesc(obj) or obj
-                if root and root.Parent then
-                    table.insert(matches, root)
-                end
-            end
-        end
-    end
-    return matches
-end
-
-function Movement.CollectHooks()
-    local matches = {}
-    local hookNames = {
-        ["hookpoint"] = true,
-        ["hook"] = true,
-        ["hookmeat"] = true
-    }
-    local hookPrefix = "ho"
-    
-    for _, obj in ipairs(Nexus.Services.Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Model") then
-            local nameLower = string.lower(obj.Name)
-            if hookNames[nameLower] or string.sub(nameLower, 1, #hookPrefix) == hookPrefix then
-                local root = Movement.FindRootForDesc(obj) or obj
-                if root and root.Parent then
-                    table.insert(matches, root)
-                end
-            end
-        end
-    end
-    return matches
-end
-
-function Movement.CollectPlayers()
-    local pool = {}
-    for _, pl in ipairs(Nexus.Services.Players:GetPlayers()) do
-        if pl ~= Nexus.Player and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
-            table.insert(pool, pl)
-        end
-    end
-    return pool
-end
-
-function Movement.FindRootForDesc(desc)
-    if not desc then return nil end
-    if desc:IsA("BasePart") or desc:IsA("MeshPart") then
-        return desc
-    end
-    if desc:IsA("Model") then
-        return desc.PrimaryPart or desc:FindFirstChildWhichIsA("BasePart") or desc:FindFirstChildWhichIsA("MeshPart")
-    end
-    return nil
-end
-
-function Movement.SafeTeleportTo(part)
-    local char = Nexus.getCharacter()
-    if not char or not part then return false end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    
-    if not part or not part.Parent then return false end
-    
-    pcall(function()
-        hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
-    end)
-    return true
-end
-
--- ========== INFINITE LUNGE FUNCTIONS ==========
-
-function Movement.EnableInfiniteLunge()
-    if Movement.InfiniteLunge.enabled then return end
-    Movement.InfiniteLunge.enabled = true
-    Nexus.States.InfiniteLungeEnabled = true
-    
-    -- Input handlers
-    local inputBeganConn = Nexus.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        Movement.HandleLungeInput(input, gameProcessed, true)
-    end)
-    
-    local inputEndedConn = Nexus.Services.UserInputService.InputEnded:Connect(function(input, gameProcessed)
-        Movement.HandleLungeInput(input, gameProcessed, false)
-    end)
-    
-    Movement.Connections.InfiniteLungeBegan = inputBeganConn
-    Movement.Connections.InfiniteLungeEnded = inputEndedConn
-    
-    print("Infinite Lunge Enabled")
-end
-
-function Movement.DisableInfiniteLunge()
-    if not Movement.InfiniteLunge.enabled then return end
-    Movement.InfiniteLunge.enabled = false
-    Nexus.States.InfiniteLungeEnabled = false
-    Movement.InfiniteLunge.isLunging = false
-    
-    if Movement.InfiniteLunge.connection then
-        Movement.InfiniteLunge.connection:Disconnect()
-        Movement.InfiniteLunge.connection = nil
-    end
-    
-    Nexus.safeDisconnect(Movement.Connections.InfiniteLungeBegan)
-    Nexus.safeDisconnect(Movement.Connections.InfiniteLungeEnded)
-    
-    print("Infinite Lunge Disabled")
-end
-
-function Movement.HandleLungeInput(input, gameProcessed, isBegan)
-    if gameProcessed or not Movement.InfiniteLunge.enabled then return end
-    
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if isBegan then
-            Movement.InfiniteLunge.isLunging = true
-            Movement.StartLunge()
-        else
-            Movement.InfiniteLunge.isLunging = false
-            Movement.StopLunge()
-        end
-    end
-end
-
-function Movement.StartLunge()
-    if Movement.InfiniteLunge.connection then
-        Movement.InfiniteLunge.connection:Disconnect()
-    end
-    
-    Movement.InfiniteLunge.connection = Nexus.Services.RunService.Heartbeat:Connect(function()
-        if not Movement.InfiniteLunge.enabled or not Movement.InfiniteLunge.isLunging or not Nexus.Player.Character then
-            if Movement.InfiniteLunge.connection then
-                Movement.InfiniteLunge.connection:Disconnect()
-                Movement.InfiniteLunge.connection = nil
-            end
-            return
-        end
-        
-        local rootPart = Nexus.Player.Character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            local lookVector = rootPart.CFrame.LookVector
-            local velocity = lookVector * Movement.InfiniteLunge.speed
-            rootPart.Velocity = Vector3.new(velocity.X, rootPart.Velocity.Y, velocity.Z)
-        end
-    end)
-end
-
-function Movement.StopLunge()
-    if Movement.InfiniteLunge.connection then
-        Movement.InfiniteLunge.connection:Disconnect()
-        Movement.InfiniteLunge.connection = nil
-    end
-end
-
-function Movement.SetLungeSpeed(speed)
-    Movement.InfiniteLunge.speed = tonumber(speed) or 50
-    print("Lunge speed set to: " .. Movement.InfiniteLunge.speed)
-end
-
--- ========== WALK SPEED FUNCTIONS ==========
-
-function Movement.EnableWalkSpeed()
-    if Movement.WalkSpeed.enabled then return end
-    Movement.WalkSpeed.enabled = true
-    Nexus.States.WalkSpeedEnabled = true
-    
-    Movement.WalkSpeed.connection = Nexus.Services.RunService.Heartbeat:Connect(function()
-        if not Movement.WalkSpeed.enabled or not Nexus.Player.Character then
-            if Movement.WalkSpeed.connection then
-                Movement.WalkSpeed.connection:Disconnect()
-                Movement.WalkSpeed.connection = nil
-            end
-            return
-        end
-        
-        local character = Nexus.Player.Character
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
-        
-        local direction = Vector3.new(0, 0, 0)
-        local camera = Nexus.Services.Workspace.CurrentCamera
-        
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            direction = direction + camera.CFrame.LookVector
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            direction = direction - camera.CFrame.LookVector
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            direction = direction - camera.CFrame.RightVector
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            direction = direction + camera.CFrame.RightVector
-        end
-        
-        if direction.Magnitude > 0 then
-            direction = direction.Unit
-            local velocity = direction * Movement.WalkSpeed.speed
-            rootPart.Velocity = Vector3.new(velocity.X, rootPart.Velocity.Y, velocity.Z)
-        end
-    end)
-    
-    print("WalkSpeed Enabled")
-end
-
-function Movement.DisableWalkSpeed()
-    if not Movement.WalkSpeed.enabled then return end
-    Movement.WalkSpeed.enabled = false
-    Nexus.States.WalkSpeedEnabled = false
-    
-    if Movement.WalkSpeed.connection then
-        Movement.WalkSpeed.connection:Disconnect()
-        Movement.WalkSpeed.connection = nil
-    end
-    
-    print("WalkSpeed Disabled")
-end
-
-function Movement.SetWalkSpeed(speed)
-    Movement.WalkSpeed.speed = tonumber(speed) or 16
-    print("WalkSpeed set to: " .. Movement.WalkSpeed.speed)
-end
-
--- ========== NOCLIP FUNCTIONS ==========
-
-function Movement.EnableNoClip()
-    if Movement.NoClip.enabled then return end
-    Movement.NoClip.enabled = true
-    Nexus.States.noclipEnabled = true
-    
-    local function saveOriginalCollisions(character)
-        if not character then return end
-        
-        Movement.NoClip.originalCollisions = {}
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then 
-                Movement.NoClip.originalCollisions[part] = part.CanCollide
-            end
-        end
-    end
-
-    local function restoreOriginalCollisions(character)
-        if not character then return end
-        
-        for part, canCollide in pairs(Movement.NoClip.originalCollisions) do
-            if part and part.Parent then
-                pcall(function()
-                    part.CanCollide = canCollide
-                end)
-            end
-        end
-        Movement.NoClip.originalCollisions = {}
-    end
-
-    local character = Nexus.getCharacter()
-    if character then
-        saveOriginalCollisions(character)
-    end
-    
-    Movement.NoClip.connection = Nexus.Services.RunService.Stepped:Connect(function()
-        if not Movement.NoClip.enabled or not Nexus.getCharacter() then 
-            if Movement.NoClip.connection then
-                Movement.NoClip.connection:Disconnect()
-                Movement.NoClip.connection = nil
-            end
-            return 
-        end
-        
-        local character = Nexus.getCharacter()
-        if character then
-            for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then 
-                    pcall(function()
-                        part.CanCollide = false
-                    end)
-                end
-            end
-        end
-    end)
-    
-    Nexus.Player.CharacterAdded:Connect(function(newChar)
-        if Movement.NoClip.enabled then
-            task.wait(1)
-            saveOriginalCollisions(newChar)
-            print("NoClip applied to new character")
-        end
-    end)
-    
-    print("NoClip Enabled")
-end
-
-function Movement.DisableNoClip()
-    if not Movement.NoClip.enabled then return end
-    Movement.NoClip.enabled = false
-    Nexus.States.noclipEnabled = false
-    
-    if Movement.NoClip.connection then
-        Movement.NoClip.connection:Disconnect()
-        Movement.NoClip.connection = nil
-    end
-    
-    local character = Nexus.getCharacter()
-    if character then
-        restoreOriginalCollisions(character)
-    end
-    
-    print("NoClip Disabled")
-end
-
--- ========== FOV FUNCTIONS ==========
-
-function Movement.ToggleFOV(enabled)
-    Movement.FOV.enabled = enabled
-    Movement.ApplyFOV()
-end
-
-function Movement.SetFOV(value)
-    Movement.FOV.value = value
-    Movement.FOV.targetValue = value
-    Movement.ApplyFOV()
-end
-
-function Movement.ApplyFOV()
-    local camera = Nexus.Camera
-    if camera and Movement.FOV.enabled then
-        Movement.FOV.targetValue = Movement.FOV.value
-        
-        if Movement.FOV.currentTween then
-            Movement.FOV.currentTween:Cancel()
-        end
-        
-        Movement.FOV.currentTween = Nexus.Services.TweenService:Create(camera, Movement.FOV.tweenInfo, 
-            {FieldOfView = Movement.FOV.targetValue})
-        Movement.FOV.currentTween:Play()
-    elseif camera then
-        if Movement.FOV.currentTween then
-            Movement.FOV.currentTween:Cancel()
-            Movement.FOV.currentTween = nil
-        end
-        camera.FieldOfView = 70
-    end
-end
-
--- ========== FLY FUNCTIONS ==========
-
-function Movement.EnableFly()
-    if Movement.Fly.enabled then return end
-    Movement.Fly.enabled = true
-    Nexus.States.FlyEnabled = true
-    
-    local character, humanoid, rootPart = Nexus.getCharacter(), Nexus.getHumanoid(), Nexus.getRootPart()
-    if not character or not humanoid or not rootPart then return end
-    
-    humanoid.PlatformStand = true
-    Movement.Fly.bodyVelocity = Instance.new("BodyVelocity")
-    Movement.Fly.bodyGyro = Instance.new("BodyGyro")
-    
-    Movement.Fly.bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    Movement.Fly.bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    Movement.Fly.bodyVelocity.Parent = rootPart
-    
-    Movement.Fly.bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    Movement.Fly.bodyGyro.P = 10000
-    Movement.Fly.bodyGyro.D = 500
-    Movement.Fly.bodyGyro.CFrame = rootPart.CFrame
-    Movement.Fly.bodyGyro.Parent = rootPart
-
-    Movement.Fly.connection = Nexus.Services.RunService.Heartbeat:Connect(function()
-        if not Movement.Fly.enabled or not Movement.Fly.bodyVelocity or not Movement.Fly.bodyGyro or 
-           not character or not humanoid or not rootPart then
-            if Movement.Fly.connection then
-                Movement.Fly.connection:Disconnect()
-                Movement.Fly.connection = nil
-            end
-            return
-        end
-        
-        local camera, direction = Nexus.Services.Workspace.CurrentCamera, Vector3.new(0, 0, 0)
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then 
-            direction = direction + camera.CFrame.LookVector 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then 
-            direction = direction - camera.CFrame.LookVector 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then 
-            direction = direction - camera.CFrame.RightVector 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then 
-            direction = direction + camera.CFrame.RightVector 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
-            direction = direction + Vector3.new(0, 1, 0) 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then 
-            direction = direction + Vector3.new(0, -1, 0) 
-        end
-
-        if direction.Magnitude > 0 then 
-            direction = direction.Unit * Movement.Fly.speed 
-        end
-        
-        Movement.Fly.bodyVelocity.Velocity = direction
-        Movement.Fly.bodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + camera.CFrame.LookVector)
-    end)
-    
-    print("Fly Enabled")
-end
-
-function Movement.DisableFly()
-    if not Movement.Fly.enabled then return end
-    Movement.Fly.enabled = false
-    Nexus.States.FlyEnabled = false
-    
-    if Movement.Fly.bodyVelocity then 
-        Movement.Fly.bodyVelocity:Destroy()
-        Movement.Fly.bodyVelocity = nil 
-    end
-    if Movement.Fly.bodyGyro then 
-        Movement.Fly.bodyGyro:Destroy()
-        Movement.Fly.bodyGyro = nil 
-    end
-    
-    local humanoid = Nexus.getHumanoid()
-    if humanoid then 
-        humanoid.PlatformStand = false 
-    end
-    
-    if Movement.Fly.connection then
-        Movement.Fly.connection:Disconnect()
-        Movement.Fly.connection = nil
-    end
-    
-    print("Fly Disabled")
-end
-
-function Movement.SetFlySpeed(speed)
-    Movement.Fly.speed = tonumber(speed) or 50
-    print("Fly speed set to: " .. Movement.Fly.speed)
-end
-
--- ========== FREE CAMERA FUNCTIONS ==========
-
-function Movement.EnableFreeCamera()
-    if Movement.FreeCamera.enabled then return end
-    Movement.FreeCamera.enabled = true
-    Nexus.States.FreeCameraEnabled = true
-    
-    local camera = Nexus.Camera
-    Movement.FreeCamera.originalCameraType = camera.CameraType
-    Movement.FreeCamera.originalCameraSubject = camera.CameraSubject
-    camera.CameraType = Enum.CameraType.Scriptable
-    
-    local cameraPosition = camera.CFrame.Position
-    local lookVector = camera.CFrame.LookVector
-    local cameraRotation = Vector2.new(math.atan2(lookVector.X, lookVector.Z), math.asin(lookVector.Y))
-    
-    Movement.LockMouse()
-    
-    if Nexus.getCharacter() then
-        local humanoid, rootPart = Nexus.getHumanoid(), Nexus.getRootPart()
-        if humanoid then 
-            humanoid.PlatformStand = false
-            humanoid.AutoRotate = false 
-        end
-        if rootPart then 
-            rootPart.Anchored = true 
-        end
-    end
-    
-    Movement.FreeCamera.connection = Nexus.Services.RunService.RenderStepped:Connect(function(delta)
-        if not Movement.FreeCamera.enabled then 
-            if Movement.FreeCamera.connection then
-                Movement.FreeCamera.connection:Disconnect()
-                Movement.FreeCamera.connection = nil
-            end
-            return 
-        end
-        
-        local mouseDelta = Nexus.Services.UserInputService:GetMouseDelta()
-        cameraRotation = cameraRotation + Vector2.new(-mouseDelta.X * 0.003, -mouseDelta.Y * 0.003)
-        cameraRotation = Vector2.new(cameraRotation.X, 
-            math.clamp(cameraRotation.Y, -math.pi/2 + 0.1, math.pi/2 - 0.1))
-        
-        local rotationCFrame = CFrame.Angles(0, cameraRotation.X, 0) * CFrame.Angles(cameraRotation.Y, 0, 0)
-        local moveDirection = Vector3.new(0, 0, 0)
-        
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then 
-            moveDirection = moveDirection + rotationCFrame.LookVector 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then 
-            moveDirection = moveDirection - rotationCFrame.LookVector 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then 
-            moveDirection = moveDirection - rotationCFrame.RightVector 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then 
-            moveDirection = moveDirection + rotationCFrame.RightVector 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.E) or 
-           Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
-            moveDirection = moveDirection + Vector3.new(0, 1, 0) 
-        end
-        if Nexus.Services.UserInputService:IsKeyDown(Enum.KeyCode.Q) then 
-            moveDirection = moveDirection + Vector3.new(0, -1, 0) 
-        end
-        
-        if moveDirection.Magnitude > 0 then 
-            moveDirection = moveDirection.Unit * Movement.FreeCamera.speed
-            cameraPosition = cameraPosition + moveDirection * delta 
-        end
-        
-        camera.CFrame = CFrame.new(cameraPosition) * rotationCFrame
-    end)
-    
-    print("Free Camera Enabled")
-end
-
-function Movement.DisableFreeCamera()
-    if not Movement.FreeCamera.enabled then return end
-    Movement.FreeCamera.enabled = false
-    Nexus.States.FreeCameraEnabled = false
-    
-    Movement.UnlockMouse()
-    
-    if Movement.FreeCamera.connection then
-        Movement.FreeCamera.connection:Disconnect()
-        Movement.FreeCamera.connection = nil
-    end
-    
-    local camera = Nexus.Camera
-    camera.CameraType = Movement.FreeCamera.originalCameraType
-    camera.CameraSubject = Movement.FreeCamera.originalCameraSubject
-    
-    if Nexus.getCharacter() then
-        local humanoid, rootPart = Nexus.getHumanoid(), Nexus.getRootPart()
-        if humanoid then 
-            humanoid.PlatformStand = false
-            humanoid.AutoRotate = true 
-        end
-        if rootPart then 
-            rootPart.Anchored = false 
-        end
-    end
-    
-    print("Free Camera Disabled")
-end
-
-function Movement.LockMouse()
-    if not Movement.FreeCamera.enabled then return end
-    Movement.FreeCamera.mouseLocked = true
-    Nexus.Services.UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-    Nexus.Services.UserInputService.MouseIconEnabled = false
-end
-
-function Movement.UnlockMouse()
-    Movement.FreeCamera.mouseLocked = false
-    Nexus.Services.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-    Nexus.Services.UserInputService.MouseIconEnabled = true
-end
-
-function Movement.SetFreeCameraSpeed(speed)
-    Movement.FreeCamera.speed = tonumber(speed) or 50
-    print("Free Camera speed set to: " .. Movement.FreeCamera.speed)
-end
-
--- ========== CLEANUP ==========
-
-function Movement.Cleanup()
-    -- Отключаем все функции
-    Movement.DisableInfiniteLunge()
-    Movement.DisableWalkSpeed()
-    Movement.DisableNoClip()
-    Movement.DisableFly()
-    Movement.DisableFreeCamera()
-    Movement.ToggleFOV(false)
-    
-    -- Очищаем соединения
-    for key, connection in pairs(Movement.Connections) do
-        Nexus.safeDisconnect(connection)
-    end
-    Movement.Connections = {}
-    
-    print("Movement module cleaned up")
-end
-
-return Movement
+return MovementModule
