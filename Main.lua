@@ -1,7 +1,3 @@
--- ==============================================
--- NEXUS - Violence District (Modular Structure)
--- ==============================================
-
 -- Загрузка основных библиотек
 local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/zawerex/Nex1/refs/heads/main/Library/Nexus"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
@@ -131,14 +127,14 @@ end
 
 -- Загрузка модулей
 local modulesToLoad = {
-    ["Helpers"] = "https://raw.githubusercontent.com/yourusername/nexus/main/Modules/Helpers.lua",
-    ["UI"] = "https://raw.githubusercontent.com/yourusername/nexus/main/Modules/UI.lua",
-    ["Survivor"] = "https://raw.githubusercontent.com/yourusername/nexus/main/Modules/Survivor.lua",
-    ["Killer"] = "https://raw.githubusercontent.com/yourusername/nexus/main/Modules/Killer.lua",
-    ["Movement"] = "https://raw.githubusercontent.com/yourusername/nexus/main/Modules/Movement.lua",
-    ["Fun"] = "https://raw.githubusercontent.com/yourusername/nexus/main/Modules/Fun.lua",
-    ["Visual"] = "https://raw.githubusercontent.com/yourusername/nexus/main/Modules/Visual.lua",
-    ["Binds"] = "https://raw.githubusercontent.com/yourusername/nexus/main/Modules/Binds.lua"
+    ["Helpers"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Helpers.lua",
+    ["UI"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/UI%20Module.lua",
+    ["Survivor"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Survivor%20Module.lua",
+    ["Killer"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Killer.lua",
+    ["Movement"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Movement.lua",
+    ["Fun"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Fun.lua",
+    ["Visual"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Visual.lua",
+    ["Binds"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Binds.lua"
 }
 
 -- Загрузка каждого модуля
