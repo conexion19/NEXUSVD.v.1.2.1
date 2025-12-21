@@ -75,7 +75,32 @@ local Visual = {
         originalClockTime = nil
     }
 }
-
+  -- Добавьте эти функции:
+    IsAnyAdvancedESPComponentEnabled = function()
+        local settings = Visual.AdvancedESP.settings
+        return settings.box or 
+               settings.name or 
+               settings.healthbar or 
+               settings.distance or 
+               settings.boxFill or 
+               settings.tracers or 
+               settings.bones
+    end,
+    
+    HandleAdvancedESPComponentChange = function()
+        if Visual.IsAnyAdvancedESPComponentEnabled() then
+            if not Visual.AdvancedESP.settings.enabled then
+                Visual.StartAdvancedESP()
+                Visual.AdvancedESP.settings.enabled = true
+            end
+        else
+            if Visual.AdvancedESP.settings.enabled then
+                Visual.StopAdvancedESP()
+                Visual.AdvancedESP.settings.enabled = false
+            end
+        end
+    end
+}
 -- ========== HELPER FUNCTIONS ==========
 
 function Visual.GetGeneratorProgress(gen)
@@ -428,14 +453,17 @@ function Visual.UpdateESPDisplay()
     end
 end
 
--- ========== ADVANCED ESP SYSTEM ==========
-
 function Visual.ToggleAdvancedESP(enabled)
+    -- Эта функция теперь будет только отслеживать состояние
     Visual.AdvancedESP.settings.enabled = enabled
     
     if enabled then
-        Visual.StartAdvancedESP()
+        -- Проверяем, нужно ли запускать
+        if Visual.IsAnyAdvancedESPComponentEnabled() then
+            Visual.StartAdvancedESP()
+        end
     else
+        -- Если выключили главный тоггле, останавливаем всё
         Visual.StopAdvancedESP()
     end
 end
@@ -945,6 +973,17 @@ function Visual.StopAdvancedESP()
     Visual.AdvancedESP.playerConnections = {}
 end
 
+function Visual.IsAnyAdvancedESPComponentEnabled()
+    local settings = Visual.AdvancedESP.settings
+    return settings.box or 
+           settings.name or 
+           settings.healthbar or 
+           settings.distance or 
+           settings.boxFill or 
+           settings.tracers or 
+           settings.bones
+end
+
 -- ========== VISUAL EFFECTS FUNCTIONS ==========
 
 function Visual.ToggleNoShadow(enabled)
@@ -1054,6 +1093,22 @@ end
 
 function Visual.SetTime(time)
     Nexus.Services.Lighting.ClockTime = time
+end
+
+function Visual.HandleAdvancedESPComponentChange()
+    if Visual.IsAnyAdvancedESPComponentEnabled() then
+        -- Если какой-то компонент включен, запускаем систему
+        if not Visual.AdvancedESP.settings.enabled then
+            Visual.StartAdvancedESP()
+            Visual.AdvancedESP.settings.enabled = true
+        end
+    else
+        -- Если все компоненты выключены, останавливаем систему
+        if Visual.AdvancedESP.settings.enabled then
+            Visual.StopAdvancedESP()
+            Visual.AdvancedESP.settings.enabled = false
+        end
+    end
 end
 
 -- ========== INITIALIZATION ==========
