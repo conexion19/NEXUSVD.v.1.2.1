@@ -25,9 +25,6 @@ function UI.Init(nxs)
         UserInfoSubtitle = "user",
         UserInfoSubtitleColor = Color3.fromRGB(255, 250, 250)
     })
-
-    -- Создаем снежинки (просто вызываем без настроек)
-    Nexus.Fluent:CreateSnowflakes()
     
     -- Создаем вкладки
     Nexus.Tabs = {}
