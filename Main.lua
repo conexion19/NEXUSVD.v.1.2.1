@@ -127,7 +127,7 @@ end
 
 -- Загрузка модулей
 local modulesToLoad = {
-    ["Helpers"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/helpers.lua",
+   -- ["Helpers"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/helpers.lua",
     ["UI"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/UI.lua",
     ["Survivor"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Survivor%20Module.lua",
     ["Killer"] = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Killer.lua",
