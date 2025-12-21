@@ -379,6 +379,17 @@ local function StopSilentHeal()
         Survivor.Connections.silentHeal = nil
     end
     
+    -- Отправляем RemoteEvent "HealAnim" - false при выключении функции
+    pcall(function()
+        if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
+            local healAnimRemote = Nexus.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
+            if healAnimRemote then
+                healAnimRemote:FireServer(false)
+                print("HealAnim remote fired with: false")
+            end
+        end
+    end)
+    
     for i = 1, 2 do
         pcall(SendStopHealEvent)
         task.wait(0.05)
