@@ -215,33 +215,6 @@ local function initializeNexus()
         
         _G.Nexus.Window:SelectTab(1)
     end
-
-         task.spawn(function()
-            task.wait(1) -- Даем время окну полностью инициализироваться
-            
-            -- Проверяем, есть ли окно и включен ли снегопад в настройках
-            if _G.Nexus.Window and InterfaceManager.Settings.Snowfall then
-                -- Применяем настройку снегопада
-                local snowfallToggle = Fluent.Options.SnowfallToggle
-                if snowfallToggle then
-                    snowfallToggle:SetValue(InterfaceManager.Settings.Snowfall)
-                    
-                    -- Если снегопад включен и в конфиге окна он разрешен
-                    if InterfaceManager.Settings.Snowfall and _G.Nexus.Window.SnowfallEnabled ~= false then
-                        -- Ждем еще немного для полной загрузки
-                        task.wait(0.5)
-                        
-                        -- Создаем снегопад с настройками из окна
-                        if Fluent.AddSnowfallToWindow then
-                            Fluent:AddSnowfallToWindow(_G.Nexus.Window.SnowfallConfig or {
-                                Count = 70,
-                                Speed = 10
-                            })
-                        end
-                    end
-                end
-            end
-        end)
     
     -- Загружаем сохраненную конфигурацию
     SaveManager:LoadAutoloadConfig()
