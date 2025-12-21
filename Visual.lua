@@ -249,7 +249,7 @@ function Visual.AddObjectToTrack(obj)
     
     if nameLower:find("generator") then 
         Visual.ESP.trackedObjects[obj] = "Generators"
-    elseif nameLower:find("pallet") then 
+    elseif nameLower:find("palletpoint") then -- ИСПРАВЛЕНИЕ: проверяем только PalletPoint
         Visual.ESP.trackedObjects[obj] = "Pallets"
     elseif nameLower:find("gate") then 
         Visual.ESP.trackedObjects[obj] = "ExitGates"
