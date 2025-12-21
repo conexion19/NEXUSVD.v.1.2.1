@@ -201,22 +201,20 @@ local function initializeNexus()
     InterfaceManager:SetLibrary(Fluent)
     SaveManager:IgnoreThemeSettings()
     SaveManager:SetIgnoreIndexes({})
+    
     InterfaceManager:SetFolder("FluentScriptHub")
     SaveManager:SetFolder("FluentScriptHub/violence-district")
     
     -- Добавляем вкладку Settings
-if _G.Nexus.Window then
-    local Tabs = _G.Nexus.Tabs
-    Tabs.Settings = _G.Nexus.Window:AddTab({ Title = "Settings", Icon = "snowflake" })
-    
-    -- Добавляем настройки снежинок в начало
-    Library:AddSnowflakesSettings(Tabs.Settings)
-    
-    InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-    SaveManager:BuildConfigSection(Tabs.Settings)
-    
-    _G.Nexus.Window:SelectTab(1)
-end
+    if _G.Nexus.Window then
+        local Tabs = _G.Nexus.Tabs
+        Tabs.Settings = _G.Nexus.Window:AddTab({ Title = "Settings", Icon = "settings" })
+        
+        InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+        SaveManager:BuildConfigSection(Tabs.Settings)
+        
+        _G.Nexus.Window:SelectTab(1)
+    end
     
     -- Загружаем сохраненную конфигурацию
     SaveManager:LoadAutoloadConfig()
@@ -242,13 +240,9 @@ end
 -- Запуск инициализации
 pcall(initializeNexus)
 
+-- Обработка выхода игрока
 Players.PlayerRemoving:Connect(function(leavingPlayer)
     if leavingPlayer == player then
-        -- Очистка снежинок
-        if Nexus.Fluent and Nexus.Fluent.RemoveSnowflakes then
-            Nexus.Fluent:RemoveSnowflakes()
-        end
-        
         -- Очистка всех соединений
         for _, connection in pairs(_G.Nexus.Connections) do
             safeDisconnect(connection)
