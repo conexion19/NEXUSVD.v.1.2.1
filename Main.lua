@@ -201,7 +201,6 @@ local function initializeNexus()
     InterfaceManager:SetLibrary(Fluent)
     SaveManager:IgnoreThemeSettings()
     SaveManager:SetIgnoreIndexes({})
-    
     InterfaceManager:SetFolder("FluentScriptHub")
     SaveManager:SetFolder("FluentScriptHub/violence-district")
     
@@ -243,9 +242,13 @@ end
 -- Запуск инициализации
 pcall(initializeNexus)
 
--- Обработка выхода игрока
 Players.PlayerRemoving:Connect(function(leavingPlayer)
     if leavingPlayer == player then
+        -- Очистка снежинок
+        if Nexus.Fluent and Nexus.Fluent.RemoveSnowflakes then
+            Nexus.Fluent:RemoveSnowflakes()
+        end
+        
         -- Очистка всех соединений
         for _, connection in pairs(_G.Nexus.Connections) do
             safeDisconnect(connection)
