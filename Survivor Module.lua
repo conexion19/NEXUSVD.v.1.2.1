@@ -67,6 +67,7 @@ local AutoParry = (function()
     local RANGE = 10
     local lastCheck = 0
     local CHECK_INTERVAL = 0.01
+    local useRemoteEvent = false -- Флаг для переключения между методами
 
     local AttackAnimations = {
         "rbxassetid://110355011987939",
@@ -118,6 +119,28 @@ local AutoParry = (function()
         return false
     end
 
+    local function PerformParry()
+        if useRemoteEvent then
+            -- Используем RemoteEvent "parry"
+            pcall(function()
+                if Nexus.Services.ReplicatedStorage.Remotes and 
+                   Nexus.Services.ReplicatedStorage.Remotes.Items and
+                   Nexus.Services.ReplicatedStorage.Remotes.Items["Parrying Dagger"] then
+                    Nexus.Services.ReplicatedStorage.Remotes.Items["Parrying Dagger"].parry:FireServer()
+                end
+            end)
+        else
+            -- Используем стандартный метод через ЛКМ
+            spamActive = true
+            Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
+            task.spawn(function()
+                task.wait(0.01)
+                Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
+                spamActive = false
+            end)
+        end
+    end
+
     local function Enable()
         if Nexus.States.AutoParryEnabled then return end
         Nexus.States.AutoParryEnabled = true
@@ -125,7 +148,7 @@ local AutoParry = (function()
         
         Survivor.Connections.AutoParry = Nexus.Services.RunService.Heartbeat:Connect(function()
             if not Nexus.States.AutoParryEnabled then
-                if spamActive then 
+                if spamActive and not useRemoteEvent then 
                     spamActive = false; 
                     Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0) 
                 end
@@ -133,15 +156,10 @@ local AutoParry = (function()
             end
 
             if isBlockingInRange() then
-                if not spamActive then
-                    spamActive = true
-                    Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
-                    task.spawn(function()
-                        task.wait(0.01)
-                        Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
-                    end)
+                if not spamActive or useRemoteEvent then
+                    PerformParry()
                 end
-            elseif spamActive then
+            elseif spamActive and not useRemoteEvent then
                 spamActive = false
                 Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
             end
@@ -150,7 +168,7 @@ local AutoParry = (function()
 
     local function Disable()
         Nexus.States.AutoParryEnabled = false
-        if spamActive then 
+        if spamActive and not useRemoteEvent then 
             spamActive = false; 
             Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0) 
         end 
@@ -170,368 +188,19 @@ local AutoParry = (function()
             RANGE = tonumber(value) or 10
             print("AutoParry range set to: " .. RANGE)
         end,
-        GetRange = function() return RANGE end
-    }
-end)()
-
--- ========== AUTO PARRY V2 ==========
-
-local AutoParryV2 = (function()
-    local isParryOnCooldown = false
-    local animationConnections, customBar, fillBar, timeText = {}, nil, nil, nil
-    local PARRY_COOLDOWN = 40.264
-    local RANGE = 10
-    local hideBarsConnection = nil
-
-    local AttackAnimations = {
-        "rbxassetid://110355011987939",
-        "rbxassetid://139369275981139", 
-        "rbxassetid://117042998468241",
-        "rbxassetid://133963973694098",
-        "rbxassetid://113255068724446",
-        "rbxassetid://74968262036854",
-        "rbxassetid://118907603246885",
-        "rbxassetid://78432063483146",
-        "rbxassetid://129784271201071",
-        "rbxassetid://122812055447896",
-        "rbxassetid://138720291317243",
-        "rbxassetid://105834496520"
-    }
-
-    local function IsPlayerKiller(targetPlayer)
-        if not targetPlayer or not targetPlayer.Character then return false end
-        if targetPlayer.Team then return targetPlayer.Team.Name:lower() == "killer" end
-        local humanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-        return humanoid and humanoid.DisplayName:lower() == "killer"
-    end
-
-    local function IsPlayerInRange(targetPlayer, maxDistance)
-        local localRoot = Nexus.getRootPart()
-        local targetRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-        
-        if not localRoot or not targetRoot then return false end
-        
-        local distance = (localRoot.Position - targetRoot.Position).Magnitude
-        local numDistance = tonumber(distance) or 0
-        local numMaxDistance = tonumber(maxDistance) or 10
-        
-        return numDistance <= numMaxDistance
-    end
-
-    local function IsAttackEmote(emoteId)
-        if not emoteId or type(emoteId) ~= "string" then return false end
-        
-        for _, attackId in ipairs(AttackAnimations) do 
-            if emoteId == attackId then 
-                return true 
-            end 
-        end
-        return false
-    end
-
-    local function HideOriginalBars()
-        pcall(function()
-            local playerGui = Nexus.Player:WaitForChild("PlayerGui")
-            local survivorGui = playerGui:FindFirstChild("Survivor")
-            if survivorGui then
-                local genFrame = survivorGui:FindFirstChild("Gen")
-                if genFrame then
-                    local itemFrame = genFrame:FindFirstChild("ItemFrame")
-                    if itemFrame then
-                        local gui = itemFrame:FindFirstChild("Gui")
-                        if gui then
-                            local originalBar = gui:FindFirstChild("Bar")
-                            local originalBack = gui:FindFirstChild("back")
-                            if originalBar then 
-                                originalBar.Visible = false 
-                            end
-                            if originalBack then 
-                                originalBack.Visible = false 
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    local function ShowOriginalBars()
-        pcall(function()
-            local playerGui = Nexus.Player:WaitForChild("PlayerGui")
-            local survivorGui = playerGui:FindFirstChild("Survivor")
-            if survivorGui then
-                local genFrame = survivorGui:FindFirstChild("Gen")
-                if genFrame then
-                    local itemFrame = genFrame:FindFirstChild("ItemFrame")
-                    if itemFrame then
-                        local gui = itemFrame:FindFirstChild("Gui")
-                        if gui then
-                            local originalBar = gui:FindFirstChild("Bar")
-                            local originalBack = gui:FindFirstChild("back")
-                            if originalBar then originalBar.Visible = true end
-                            if originalBack then originalBack.Visible = true end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    local function StartConstantBarHiding()
-        if hideBarsConnection then
-            hideBarsConnection:Disconnect()
-            hideBarsConnection = nil
-        end
-        
-        hideBarsConnection = Nexus.Services.RunService.Heartbeat:Connect(function()
-            if not Nexus.States.AutoParryV2Enabled then
-                if hideBarsConnection then
-                    hideBarsConnection:Disconnect()
-                    hideBarsConnection = nil
-                end
-                return
-            end
+        GetRange = function() return RANGE end,
+        SetUseRemoteEvent = function(value)
+            useRemoteEvent = value
+            print("Parry method set to: " .. (value and "RemoteEvent" or "Mouse Click"))
             
-            pcall(function()
-                local playerGui = Nexus.Player:WaitForChild("PlayerGui")
-                local survivorGui = playerGui:FindFirstChild("Survivor")
-                if survivorGui then
-                    local genFrame = survivorGui:FindFirstChild("Gen")
-                    if genFrame then
-                        local itemFrame = genFrame:FindFirstChild("ItemFrame")
-                        if itemFrame then
-                            local gui = itemFrame:FindFirstChild("Gui")
-                            if gui then
-                                local originalBar = gui:FindFirstChild("Bar")
-                                local originalBack = gui:FindFirstChild("back")
-                                
-                                if originalBar and originalBar.Visible then
-                                    originalBar.Visible = false
-                                end
-                                if originalBack and originalBack.Visible then
-                                    originalBack.Visible = false
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-        end)
-    end
-
-    local function CreateCustomBar()
-        if customBar and customBar.Gui then 
-            pcall(function() customBar.Gui:Destroy() end) 
-        end
-        
-        local screenGui = Instance.new("ScreenGui")
-        screenGui.Name = "CustomParryBar"
-        screenGui.Parent = Nexus.Player:WaitForChild("PlayerGui")
-        screenGui.ResetOnSpawn = false
-        
-        local mainContainer = Instance.new("Frame")
-        mainContainer.Name = "MainContainer"
-        mainContainer.Size = UDim2.new(0, 40, 0, 150)
-        mainContainer.Position = UDim2.new(0, 10, 1, -317)
-        mainContainer.BackgroundTransparency = 1
-        mainContainer.Visible = Nexus.States.AutoParryV2Enabled
-        mainContainer.Parent = screenGui
-        
-        timeText = Instance.new("TextLabel")
-        timeText.Name = "TimeText"
-        timeText.Size = UDim2.new(1, 0, 0, 25)
-        timeText.Position = UDim2.new(0, 0, 0, 0)
-        timeText.BackgroundTransparency = 1
-        timeText.Text = "00.000"
-        timeText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        timeText.TextScaled = true
-        timeText.Font = Enum.Font.GothamBold
-        timeText.TextXAlignment = Enum.TextXAlignment.Center
-        timeText.Parent = mainContainer
-        
-        local barContainer = Instance.new("Frame")
-        barContainer.Name = "BarContainer"
-        barContainer.Size = UDim2.new(0, 10, 0, 80)
-        barContainer.Position = UDim2.new(0.5, -5, 0, 30)
-        barContainer.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        barContainer.BorderSizePixel = 1
-        barContainer.BorderColor3 = Color3.fromRGB(100, 100, 100)
-        barContainer.Parent = mainContainer
-        
-        local containerCorner = Instance.new("UICorner")
-        containerCorner.CornerRadius = UDim.new(1, 0) 
-        containerCorner.Parent = barContainer
-        
-        fillBar = Instance.new("Frame")
-        fillBar.Name = "Fill"
-        fillBar.Size = UDim2.new(1, 0, 0, 0)
-        fillBar.Position = UDim2.new(0, 0, 1, 0)
-        fillBar.AnchorPoint = Vector2.new(0, 1)
-        fillBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        fillBar.BorderSizePixel = 0
-        fillBar.Parent = barContainer
-        
-        local fillCorner = Instance.new("UICorner")
-        fillCorner.CornerRadius = UDim.new(1, 0)
-        fillCorner.Parent = fillBar
-        
-        customBar = {Gui = screenGui, Container = mainContainer, Fill = fillBar, TimeText = timeText}
-        return customBar
-    end
-
-    local function StartParryCooldown()
-        if isParryOnCooldown then return end
-        isParryOnCooldown = true
-        if customBar and customBar.Container then customBar.Container.Visible = true end
-        
-        local startTime, endTime = tick(), tick() + PARRY_COOLDOWN
-        task.spawn(function()
-            while tick() < endTime and isParryOnCooldown do
-                local currentTime, elapsed, progress, remainingTime = tick(), tick() - startTime, (tick() - startTime) / PARRY_COOLDOWN, endTime - tick()
-                if progress > 1 then progress = 1 end
-                if fillBar then fillBar.Size = UDim2.new(1, 0, progress, 0) end
-                if timeText then
-                    timeText.Text = remainingTime > 0 and string.format("%02d.%03d", math.floor(remainingTime), math.floor((remainingTime - math.floor(remainingTime)) * 1000)) or "00.000"
-                end
-                task.wait(0.01)
-            end
-            
-            if isParryOnCooldown then
-                isParryOnCooldown = false
-                if customBar and customBar.Container then
-                    if fillBar then fillBar.Size = UDim2.new(1, 0, 1, 0) end
-                    if timeText then timeText.Text = "00.000" end
-                end
-            end
-        end)
-    end
-
-    local function ClearAnimationConnections()
-        for _, connection in pairs(animationConnections) do 
-            Nexus.safeDisconnect(connection) 
-        end
-        animationConnections = {}
-    end
-
-    local function Enable()
-        if Nexus.States.AutoParryV2Enabled then return end
-        Nexus.States.AutoParryV2Enabled = true
-        print("AutoParryV2 Enabled")
-        
-        CreateCustomBar()
-        HideOriginalBars()
-        
-        StartConstantBarHiding()
-        
-        if customBar and customBar.Container then 
-            customBar.Container.Visible = true 
-        end
-        
-        local function setupPlayerTracking(targetPlayer)
-            if animationConnections[targetPlayer] then return end
-            
-            local function trackCharacter(character)
-                local humanoid = character:WaitForChild("Humanoid")
-                if humanoid then
-                    local connection = humanoid.AnimationPlayed:Connect(function(animationTrack)
-                        if not animationTrack or not animationTrack.Animation then return end
-                        
-                        if IsPlayerKiller(targetPlayer) and 
-                           IsPlayerInRange(targetPlayer, RANGE) and 
-                           IsAttackEmote(animationTrack.Animation.AnimationId) and 
-                           not isParryOnCooldown then
-                            pcall(function()
-                                Nexus.Services.ReplicatedStorage.Remotes.Items["Parrying Dagger"].parry:FireServer()
-                                StartParryCooldown()
-                            end)
-                        end
-                    end)
-                    animationConnections[targetPlayer] = connection
-                end
-            end
-            
-            if targetPlayer.Character then trackCharacter(targetPlayer.Character) end
-            targetPlayer.CharacterAdded:Connect(trackCharacter)
-            targetPlayer.CharacterRemoving:Connect(function()
-                if animationConnections[targetPlayer] then 
-                    Nexus.safeDisconnect(animationConnections[targetPlayer])
-                    animationConnections[targetPlayer] = nil 
-                end
-            end)
-        end
-        
-        for _, targetPlayer in ipairs(Nexus.Services.Players:GetPlayers()) do 
-            if targetPlayer ~= Nexus.Player then 
-                setupPlayerTracking(targetPlayer) 
-            end 
-        end
-        
-        Nexus.Services.Players.PlayerAdded:Connect(function(targetPlayer) 
-            if targetPlayer ~= Nexus.Player then 
-                setupPlayerTracking(targetPlayer) 
-            end 
-        end)
-    end
-
-    local function Disable()
-        if not Nexus.States.AutoParryV2Enabled then return end
-        Nexus.States.AutoParryV2Enabled = false
-        
-        if hideBarsConnection then
-            hideBarsConnection:Disconnect()
-            hideBarsConnection = nil
-        end
-        
-        ClearAnimationConnections()
-        ShowOriginalBars()
-        if customBar and customBar.Container then 
-            customBar.Container.Visible = false 
-        end
-        print("AutoParryV2 Disabled")
-    end
-
-    task.spawn(function()
-        Nexus.Player:WaitForChild("PlayerGui")
-        CreateCustomBar()
-    end)
-
-    Nexus.Player.CharacterRemoving:Connect(function()
-        if Nexus.States.AutoParryV2Enabled then
-            if customBar and customBar.Container then 
-                customBar.Container.Visible = false 
-            end
-        end
-    end)
-
-    Nexus.Player.CharacterAdded:Connect(function()
-        if Nexus.States.AutoParryV2Enabled then
-            task.wait(1)
-            CreateCustomBar()
-            HideOriginalBars()
-            
-            StartConstantBarHiding()
-            
-            if customBar and customBar.Container then 
-                customBar.Container.Visible = true 
-            end
-        end
-    end)
-
-    return {
-        Enable = Enable, 
-        Disable = Disable, 
-        IsEnabled = function() return Nexus.States.AutoParryV2Enabled end,
-        SetRange = function(value) 
-            RANGE = tonumber(value) or 10
-            
-            if Nexus.States.AutoParryV2Enabled then
+            -- Перезапускаем AutoParry если он включен
+            if Nexus.States.AutoParryEnabled then
                 Disable()
                 task.wait(0.1)
                 Enable()
             end
-            print("AutoParryV2 range set to: " .. RANGE)
         end,
-        GetRange = function() return RANGE end
+        GetUseRemoteEvent = function() return useRemoteEvent end
     }
 end)()
 
@@ -984,36 +653,18 @@ function Survivor.Init(nxs)
         end
     })
 
-    -- ========== AUTO PARRY V2 ==========
-    local AutoParryV2Toggle = Tabs.Main:AddToggle("AutoParryV2", {
-        Title = "AutoParry (Anti-Stun)", 
-        Description = "automatic parry of attacks without delay", 
+    -- ========== PARRY NO ANIMATION ==========
+    local ParryNoAnimationToggle = Tabs.Main:AddToggle("ParryNoAnimation", {
+        Title = "Parry no animation", 
+        Description = "Use RemoteEvent instead of mouse click for parry", 
         Default = false
     })
 
-    AutoParryV2Toggle:OnChanged(function(v) 
+    ParryNoAnimationToggle:OnChanged(function(v) 
         Nexus.SafeCallback(function()
-            if v then 
-                AutoParryV2.Enable() 
-            else 
-                AutoParryV2.Disable() 
-            end 
+            AutoParry.SetUseRemoteEvent(v)
         end)
     end)
-
-    local AutoParryV2RangeSlider = Tabs.Main:AddSlider("AutoParryV2Range", {
-        Title = "ping compensation",
-        Description = "",
-        Default = 10,
-        Min = 0,
-        Max = 20,
-        Rounding = 2,
-        Callback = function(value)
-            Nexus.SafeCallback(function()
-                AutoParryV2.SetRange(value)
-            end)
-        end
-    })
 
     -- ========== HEAL ==========
     local HealToggle = Tabs.Main:AddToggle("Heal", {
@@ -1193,7 +844,6 @@ function Survivor.Cleanup()
     -- Отключаем все функции
     NoTurnLimit.Disable()
     AutoParry.Disable()
-    AutoParryV2.Disable()
     ResetAllHealing()
     GateTool.Disable()
     SimpleNoFall.Disable()
