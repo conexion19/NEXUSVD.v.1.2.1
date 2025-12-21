@@ -26,11 +26,39 @@ function UI.Init(nxs)
         UserInfoSubtitleColor = Color3.fromRGB(255, 250, 250)
     })
 
-        Snowfall = true, -- Включить снегопад (можно false чтобы отключить)
-    SnowfallConfig = { -- Опциональная конфигурация
-        Count = 70,     -- Количество снежинок
-        Speed = 10      -- Скорость падения
-    },
+    -- Сохраняем конфиг снегопада в глобальном объекте
+_G.Nexus.Window.SnowfallEnabled = true
+_G.Nexus.Window.SnowfallConfig = {
+    Count = 40,
+    Speed = 9.5
+}
+
+task.spawn(function()
+    task.wait(0.6)
+    
+    -- Загружаем настройки
+    InterfaceManager:LoadSettings()
+    
+    -- Если снегопад включен в настройках
+    if InterfaceManager.Settings.Snowfall == nil or InterfaceManager.Settings.Snowfall then
+        -- Создаем снегопад
+        if Fluent.AddSnowfallToWindow then
+            Fluent:AddSnowfallToWindow(_G.Nexus.Window.SnowfallConfig)
+        end
+        
+        -- Обновляем toggle в UI, если он уже создан
+        task.wait(1)
+        if Fluent.Options.SnowfallToggle then
+            Fluent.Options.SnowfallToggle:SetValue(true)
+        end
+    else
+        -- Если снегопад выключен в настройках, обновляем toggle
+        task.wait(1)
+        if Fluent.Options.SnowfallToggle then
+            Fluent.Options.SnowfallToggle:SetValue(false)
+        end
+    end
+end)
     
     -- Создаем вкладки
     Nexus.Tabs = {}
