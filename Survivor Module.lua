@@ -214,12 +214,6 @@ local function StartInstantHeal()
     Nexus.States.InstantHealRunning = true
     healingStates.instantHealRunning = true
     
-    local function IsSurvivor(targetPlayer)
-        if not targetPlayer or not targetPlayer.Team then return false end
-        local teamName = targetPlayer.Team.Name:lower()
-        return teamName:find("survivor") or teamName == "survivors" or teamName == "survivor"
-    end
-    
     Survivor.Connections.instantHeal = task.spawn(function()
         while healingStates.instantHealRunning do
             local char = Nexus.getCharacter()
@@ -231,14 +225,9 @@ local function StartInstantHeal()
                 for _, target in ipairs(Nexus.Services.Players:GetPlayers()) do
                     if target == Nexus.Player then continue end
                     
-                    if not IsSurvivor(target) then
-                        continue 
-                    end
-                    
                     if target.Character then
                         local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
                         if targetRoot then
-                            -- Проверяем расстояние только если SilentHeal выключен
                             local shouldHeal = true
                             
                             if not healingStates.silentHealRunning then
@@ -253,7 +242,6 @@ local function StartInstantHeal()
                                         if Nexus.Services.ReplicatedStorage.Remotes and 
                                            Nexus.Services.ReplicatedStorage.Remotes.Healing then
                                             Nexus.Services.ReplicatedStorage.Remotes.Healing.SkillCheckResultEvent:FireServer("success", 1, target.Character)
-                                            print("Instant Healing Survivor: " .. target.Name)
                                         end
                                     end)
                                 end
@@ -262,7 +250,7 @@ local function StartInstantHeal()
                     end
                 end
             end
-            task.wait(0.1)
+            task.wait()
         end
     end)
 end
@@ -280,29 +268,20 @@ local function StartSilentHeal()
     Nexus.States.SilentHealRunning = true
     local currentValue = true
     
-    local function IsSurvivor(targetPlayer)
-        if not targetPlayer or not targetPlayer.Team then return false end
-        local teamName = targetPlayer.Team.Name:lower()
-        return teamName:find("survivor") or teamName == "survivors" or teamName == "survivor"
-    end
-    
     Survivor.Connections.silentHeal = task.spawn(function()
         while healingStates.silentHealRunning do
             local character = Nexus.getCharacter()
             if not character or not Nexus.getRootPart() then
-                task.wait(0.4)
                 continue
             end
             
             local humanoid = Nexus.getHumanoid()
             if not humanoid or humanoid.Health <= 0 then
-                task.wait(0.4)
                 continue
             end
             
             local currentTime = tick()
             if currentTime - healingStates.lastHealTime < healingStates.healCooldown then
-                task.wait(healingStates.healCooldown)
                 continue
             end
             
@@ -311,10 +290,6 @@ local function StartSilentHeal()
             
             for _, targetPlayer in ipairs(Nexus.Services.Players:GetPlayers()) do
                 if targetPlayer == Nexus.Player then continue end
-                
-                if not IsSurvivor(targetPlayer) then
-                    continue
-                end
                 
                 if targetPlayer and targetPlayer.Character then
                     local targetHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -331,7 +306,12 @@ local function StartSilentHeal()
                                    Nexus.Services.ReplicatedStorage.Remotes.Healing then
                                     Nexus.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
                                     healingStates.lastHealTime = tick()
-                                    print("Healing Survivor: " .. targetPlayer.Name)
+                                    
+                                    -- Вызываем HealAnim с аргументом false
+                                    local healAnimRemote = Nexus.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
+                                    if healAnimRemote then
+                                        healAnimRemote:FireServer(false)
+                                    end
                                 end
                             end)
                         end
@@ -352,8 +332,6 @@ local function StartSilentHeal()
             else 
                 currentValue = not currentValue 
             end
-            
-            task.wait(0.1)
         end
         
         pcall(SendStopHealEvent)
@@ -366,27 +344,24 @@ local function StopSilentHeal()
     healingStates.silentHealRunning = false
     Nexus.States.SilentHealRunning = false
     
-    task.wait(0.1)
-    
     if Survivor.Connections.silentHeal then
         Nexus.safeDisconnect(Survivor.Connections.silentHeal)
         Survivor.Connections.silentHeal = nil
     end
     
-    -- Отправляем RemoteEvent "HealAnim" - false при выключении функции
+    -- 2 раза вызываем HealAnim с аргументом false при выключении функции
     pcall(function()
         if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
             local healAnimRemote = Nexus.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
             if healAnimRemote then
                 healAnimRemote:FireServer(false)
-                print("HealAnim remote fired with: false")
+                healAnimRemote:FireServer(false)
             end
         end
     end)
     
     for i = 1, 2 do
         pcall(SendStopHealEvent)
-        task.wait(0.05)
     end
     
     pcall(function()
