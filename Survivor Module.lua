@@ -1,4 +1,4 @@
-local Nexus = _G.Nexus
+А почему когда я включаю функицю Instant Heal все игроки начинают друг друга быстро лечить я хочу чтобы только  яих быстро лечил , дай исправленную функцию этого кода - local Nexus = _G.Nexus
 
 local Survivor = {
     Connections = {},
@@ -203,11 +203,6 @@ local AutoParry = (function()
     }
 end)()
 
--- ========== HEALING FUNCTIONS ==========
-
-local StopEmote = function() end
-local SendStopHealEvent = function() end
-
 local healingStates = {
     silentHealRunning = false,
     instantHealRunning = false,
@@ -215,56 +210,67 @@ local healingStates = {
     healCooldown = 0.2
 }
 
-local function ResetAllHealing()
-    healingStates.silentHealRunning = false
-    healingStates.instantHealRunning = false
-    Nexus.States.SilentHealRunning = false
-    Nexus.States.InstantHealRunning = false
-    Nexus.States.autoHealEnabled = false
-    
-    if Survivor.Connections.silentHeal then
-        Nexus.safeDisconnect(Survivor.Connections.silentHeal)
-        Survivor.Connections.silentHeal = nil
-    end
-    if Survivor.Connections.instantHeal then
-        Nexus.safeDisconnect(Survivor.Connections.instantHeal)
-        Survivor.Connections.instantHeal = nil
-    end
-    if Survivor.Connections.autoHeal then
-        Nexus.safeDisconnect(Survivor.Connections.autoHeal)
-        Survivor.Connections.autoHeal = nil
-    end
-end
-
 local function StartInstantHeal()
     Nexus.States.InstantHealRunning = true
+    healingStates.instantHealRunning = true
+    
+    local function IsSurvivor(targetPlayer)
+        if not targetPlayer or not targetPlayer.Team then return false end
+        local teamName = targetPlayer.Team.Name:lower()
+        return teamName:find("survivor") or teamName == "survivors" or teamName == "survivor"
+    end
     
     Survivor.Connections.instantHeal = task.spawn(function()
-        while Nexus.States.InstantHealRunning do
+        while healingStates.instantHealRunning do
             local char = Nexus.getCharacter()
-            if char and Nexus.getRootPart() then
-                local humanoid = Nexus.getHumanoid()
-                if humanoid and humanoid.Health < humanoid.MaxHealth then
-                    pcall(function() 
-                        if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
-                            -- Лечим только своего персонажа
-                            Nexus.Services.ReplicatedStorage.Remotes.Healing.SkillCheckResultEvent:FireServer("success", 1, char) 
-                            print("Instant Healing Self")
+            local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if char and myRoot then
+                local myPosition = myRoot.Position
+                
+                for _, target in ipairs(Nexus.Services.Players:GetPlayers()) do
+                    if target == Nexus.Player then continue end
+                    
+                    if not IsSurvivor(target) then
+                        continue 
+                    end
+                    
+                    if target.Character then
+                        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                        if targetRoot then
+                            -- Проверяем расстояние только если SilentHeal выключен
+                            local shouldHeal = true
+                            
+                            if not healingStates.silentHealRunning then
+                                local distance = (myPosition - targetRoot.Position).Magnitude
+                                shouldHeal = distance <= 15
+                            end
+                            
+                            if shouldHeal then
+                                local humanoid = target.Character:FindFirstChild("Humanoid")
+                                if humanoid and humanoid.Health < humanoid.MaxHealth then
+                                    pcall(function() 
+                                        if Nexus.Services.ReplicatedStorage.Remotes and 
+                                           Nexus.Services.ReplicatedStorage.Remotes.Healing then
+                                            Nexus.Services.ReplicatedStorage.Remotes.Healing.SkillCheckResultEvent:FireServer("success", 1, target.Character)
+                                            print("Instant Healing Survivor: " .. target.Name)
+                                        end
+                                    end)
+                                end
+                            end
                         end
-                    end)
+                    end
                 end
             end
-            task.wait()
+            task.wait(0.1)
         end
     end)
 end
 
 local function StopInstantHeal()
+    healingStates.instantHealRunning = false
     Nexus.States.InstantHealRunning = false
-    if Survivor.Connections.instantHeal then
-        Nexus.safeDisconnect(Survivor.Connections.instantHeal)
-        Survivor.Connections.instantHeal = nil
-    end
+    Nexus.safeDisconnect(Survivor.Connections.instantHeal)
 end
 
 local function StartSilentHeal()
@@ -273,6 +279,12 @@ local function StartSilentHeal()
     healingStates.silentHealRunning = true
     Nexus.States.SilentHealRunning = true
     local currentValue = true
+    
+    local function IsSurvivor(targetPlayer)
+        if not targetPlayer or not targetPlayer.Team then return false end
+        local teamName = targetPlayer.Team.Name:lower()
+        return teamName:find("survivor") or teamName == "survivors" or teamName == "survivor"
+    end
     
     Survivor.Connections.silentHeal = task.spawn(function()
         while healingStates.silentHealRunning do
@@ -294,19 +306,51 @@ local function StartSilentHeal()
                 continue
             end
             
-            -- Лечим только себя
-            if humanoid and humanoid.Health < humanoid.MaxHealth then
-                local args = {Nexus.getRootPart(), currentValue}
-                pcall(function() 
-                    if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
-                        Nexus.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
-                        healingStates.lastHealTime = tick()
-                        print("Healing Self")
-                        currentValue = not currentValue
+            local needsHealing = false
+            local playersHealed = 0
+            
+            for _, targetPlayer in ipairs(Nexus.Services.Players:GetPlayers()) do
+                if targetPlayer == Nexus.Player then continue end
+                
+                if not IsSurvivor(targetPlayer) then
+                    continue
+                end
+                
+                if targetPlayer and targetPlayer.Character then
+                    local targetHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if targetHumanoid and targetRoot and targetHumanoid.Health < targetHumanoid.MaxHealth then
+                        needsHealing = true
+                        playersHealed = playersHealed + 1
+                        
+                        if playersHealed <= 3 then
+                            local args = {targetRoot, currentValue}
+                            pcall(function() 
+                                if Nexus.Services.ReplicatedStorage.Remotes and 
+                                   Nexus.Services.ReplicatedStorage.Remotes.Healing then
+                                    Nexus.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
+                                    healingStates.lastHealTime = tick()
+                                    print("Healing Survivor: " .. targetPlayer.Name)
+                                end
+                            end)
+                        end
+                    else
+                        local args = {targetRoot, false}
+                        pcall(function() 
+                            if Nexus.Services.ReplicatedStorage.Remotes and 
+                               Nexus.Services.ReplicatedStorage.Remotes.Healing then
+                                Nexus.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
+                            end
+                        end)
                     end
-                end)
-            else
+                end
+            end
+            
+            if not needsHealing then 
                 pcall(SendStopHealEvent)
+            else 
+                currentValue = not currentValue 
             end
             
             task.wait(0.1)
@@ -356,6 +400,26 @@ local function StopSilentHeal()
     end)
 end
 
+local function ResetAllHealing()
+    healingStates.silentHealRunning = false
+    healingStates.instantHealRunning = false
+    Nexus.States.SilentHealRunning = false
+    Nexus.States.InstantHealRunning = false
+    Nexus.States.autoHealEnabled = false
+    
+    if Survivor.Connections.silentHeal then
+        Nexus.safeDisconnect(Survivor.Connections.silentHeal)
+        Survivor.Connections.silentHeal = nil
+    end
+    if Survivor.Connections.instantHeal then
+        Nexus.safeDisconnect(Survivor.Connections.instantHeal)
+        Survivor.Connections.instantHeal = nil
+    end
+    if Survivor.Connections.autoHeal then
+        Nexus.safeDisconnect(Survivor.Connections.autoHeal)
+        Survivor.Connections.autoHeal = nil
+    end
+end
 -- ========== GATE TOOL ==========
 
 local GateTool = (function()
