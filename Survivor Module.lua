@@ -239,34 +239,19 @@ end
 local function StartInstantHeal()
     Nexus.States.InstantHealRunning = true
     
-    local function IsSurvivor(targetPlayer)
-        if not targetPlayer or not targetPlayer.Team then return false end
-        
-        local teamName = targetPlayer.Team.Name:lower()
-        return teamName:find("survivor") or teamName == "survivors" or teamName == "survivor"
-    end
-    
     Survivor.Connections.instantHeal = task.spawn(function()
         while Nexus.States.InstantHealRunning do
             local char = Nexus.getCharacter()
             if char and Nexus.getRootPart() then
-                for _, target in ipairs(Nexus.Services.Players:GetPlayers()) do
-                    if target ~= Nexus.Player then
-                        if not IsSurvivor(target) then
-                            continue 
+                local humanoid = Nexus.getHumanoid()
+                if humanoid and humanoid.Health < humanoid.MaxHealth then
+                    pcall(function() 
+                        if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
+                            -- Лечим только своего персонажа
+                            Nexus.Services.ReplicatedStorage.Remotes.Healing.SkillCheckResultEvent:FireServer("success", 1, char) 
+                            print("Instant Healing Self")
                         end
-                        if target.Character then
-                            local targetChar, humanoid = target.Character, target.Character:FindFirstChild("Humanoid")
-                            if humanoid and humanoid.Health < humanoid.MaxHealth then
-                                pcall(function() 
-                                    if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
-                                        Nexus.Services.ReplicatedStorage.Remotes.Healing.SkillCheckResultEvent:FireServer("success", 1, targetChar) 
-                                        print("Instant Healing Survivor: " .. target.Name)
-                                    end
-                                end)
-                            end
-                        end
-                    end
+                    end)
                 end
             end
             task.wait()
@@ -276,7 +261,10 @@ end
 
 local function StopInstantHeal()
     Nexus.States.InstantHealRunning = false
-    Nexus.safeDisconnect(Survivor.Connections.instantHeal)
+    if Survivor.Connections.instantHeal then
+        Nexus.safeDisconnect(Survivor.Connections.instantHeal)
+        Survivor.Connections.instantHeal = nil
+    end
 end
 
 local function StartSilentHeal()
@@ -285,13 +273,6 @@ local function StartSilentHeal()
     healingStates.silentHealRunning = true
     Nexus.States.SilentHealRunning = true
     local currentValue = true
-    
-    local function IsSurvivor(targetPlayer)
-        if not targetPlayer or not targetPlayer.Team then return false end
-        
-        local teamName = targetPlayer.Team.Name:lower()
-        return teamName:find("survivor") or teamName == "survivors" or teamName == "survivor"
-    end
     
     Survivor.Connections.silentHeal = task.spawn(function()
         while healingStates.silentHealRunning do
@@ -313,49 +294,19 @@ local function StartSilentHeal()
                 continue
             end
             
-            local needsHealing = false
-            local playersHealed = 0
-            
-            for _, targetPlayer in ipairs(Nexus.Services.Players:GetPlayers()) do
-                if targetPlayer == Nexus.Player then continue end
-                
-                if not IsSurvivor(targetPlayer) then
-                    continue
-                end
-                
-                if targetPlayer and targetPlayer.Character then
-                    local targetHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-                    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    
-                    if targetHumanoid and targetRoot and targetHumanoid.Health < targetHumanoid.MaxHealth then
-                        needsHealing = true
-                        playersHealed = playersHealed + 1
-                        
-                        if playersHealed <= 3 then
-                            local args = {targetRoot, currentValue}
-                            pcall(function() 
-                                if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
-                                    Nexus.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
-                                    healingStates.lastHealTime = tick()
-                                    print("Healing Survivor: " .. targetPlayer.Name)
-                                end
-                            end)
-                        end
-                    else
-                        local args = {targetRoot, false}
-                        pcall(function() 
-                            if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
-                                Nexus.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
-                            end
-                        end)
+            -- Лечим только себя
+            if humanoid and humanoid.Health < humanoid.MaxHealth then
+                local args = {Nexus.getRootPart(), currentValue}
+                pcall(function() 
+                    if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
+                        Nexus.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
+                        healingStates.lastHealTime = tick()
+                        print("Healing Self")
+                        currentValue = not currentValue
                     end
-                end
-            end
-            
-            if not needsHealing then 
+                end)
+            else
                 pcall(SendStopHealEvent)
-            else 
-                currentValue = not currentValue 
             end
             
             task.wait(0.1)
