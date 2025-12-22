@@ -965,15 +965,12 @@ function Visual.ToggleNoShadow(enabled)
 end
 
 function Visual.ToggleNoFog(enabled)
+    if enabled == Visual.Effects.noFogEnabled then return end -- Предотвращаем повторные вызовы
+    
     Visual.Effects.noFogEnabled = enabled
     
-    -- Кэш для хранения оригинальных объектов тумана
-    if not Visual.Effects.fogCache then
-        Visual.Effects.fogCache = {}
-    end
-    
     if enabled then
-        -- Сохраняем оригинальные настройки освещения
+        -- Сохраняем оригинальные настройки освещения только при первом включении
         if not Visual.Effects.originalFogEnd then
             Visual.Effects.originalFogEnd = Nexus.Services.Lighting.FogEnd
             Visual.Effects.originalFogStart = Nexus.Services.Lighting.FogStart
@@ -1025,31 +1022,36 @@ function Visual.ToggleNoFog(enabled)
             end
             
             -- Настраиваем параметры тумана для полного его удаления
-            lighting.FogEnd = 100000
+            lighting.FogEnd = 1000000
             lighting.FogStart = 0
             lighting.FogDensity = 0
-            
-            -- Добавляем постоянное обновление для надежности
-            if not Visual.ESP.espConnections.noFog then
-                Visual.ESP.espConnections.noFog = Nexus.Services.RunService.Heartbeat:Connect(function()
-                    if Visual.Effects.noFogEnabled then
-                        Nexus.Services.Lighting.FogEnd = 100000
-                        Nexus.Services.Lighting.FogStart = 0
-                        Nexus.Services.Lighting.FogDensity = 0
-                        
-                        -- Также обновляем Atmosphere если он был
-                        local atmosphere = Nexus.Services.Lighting:FindFirstChild("Atmosphere")
-                        if atmosphere then
-                            atmosphere.Density = 0
-                        end
-                    else
-                        -- Отключаем соединение если функция выключена
-                        if Visual.ESP.espConnections.noFog then
-                            Visual.ESP.espConnections.noFog:Disconnect()
-                            Visual.ESP.espConnections.noFog = nil
-                        end
+        end)
+        
+        -- Добавляем постоянное обновление для надежности
+        if Visual.ESP.espConnections.noFog then
+            Visual.ESP.espConnections.noFog:Disconnect()
+            Visual.ESP.espConnections.noFog = nil
+        end
+        
+        Visual.ESP.espConnections.noFog = Nexus.Services.RunService.Heartbeat:Connect(function()
+            if Visual.Effects.noFogEnabled then
+                pcall(function()
+                    Nexus.Services.Lighting.FogEnd = 1000000
+                    Nexus.Services.Lighting.FogStart = 0
+                    Nexus.Services.Lighting.FogDensity = 0
+                    
+                    -- Также обновляем Atmosphere если он был
+                    local atmosphere = Nexus.Services.Lighting:FindFirstChild("Atmosphere")
+                    if atmosphere then
+                        atmosphere.Density = 0
                     end
                 end)
+            else
+                -- Отключаем соединение если функция выключена
+                if Visual.ESP.espConnections.noFog then
+                    Visual.ESP.espConnections.noFog:Disconnect()
+                    Visual.ESP.espConnections.noFog = nil
+                end
             end
         end)
     else
@@ -1080,6 +1082,12 @@ function Visual.ToggleNoFog(enabled)
             if atmosphere then
                 atmosphere.Density = 0.3
             end
+            
+            -- Сбрасываем оригинальные настройки для следующего включения
+            Visual.Effects.originalFogEnd = nil
+            Visual.Effects.originalFogStart = nil
+            Visual.Effects.originalFogColor = nil
+            Visual.Effects.originalFogDensity = nil
         end)
         
         -- Отключаем соединение обновления
@@ -1148,7 +1156,12 @@ function Visual.Init(nxs)
         Description = "", 
         Default = false
     })
-    NoFogToggle:OnChanged(function(v) Visual.ToggleNoFog(v) end)
+    
+    NoFogToggle:OnChanged(function(v) 
+        Nexus.SafeCallback(function()
+            Visual.ToggleNoFog(v)
+        end)
+    end)
 
     local FullBrightToggle = Tabs.Visual:AddToggle("FullBright", {
         Title = "FullBright", 
