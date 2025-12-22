@@ -37,7 +37,8 @@ function UI.Init(nxs)
     if Nexus.IS_DESKTOP then
         Nexus.Tabs.Binds = Nexus.Window:AddTab({ Title = "Binds", Icon = "snowflake" })
     end
-    
+end  -- <-- Этот end закрывает функцию UI.Init
+
 function UI.Cleanup()
     if Nexus.Window then
 
