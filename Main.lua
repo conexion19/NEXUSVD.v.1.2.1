@@ -22,7 +22,7 @@ local IS_DESKTOP = (Services.UserInputService.KeyboardEnabled and not Services.U
 local Player = Services.Players.LocalPlayer
 local Camera = Services.Workspace.CurrentCamera
 
--- Глобальный Nexus
+-- Глобальный Nexus - СОЗДАЕМ СРАЗУ
 _G.Nexus = {
     Player = Player,
     Camera = Camera,
@@ -32,45 +32,24 @@ _G.Nexus = {
     Fluent = Fluent,
     Options = Fluent.Options,
     Modules = {},
-    States = {
-        InstantHealRunning = false,
-        SilentHealRunning = false,
-        autoHealEnabled = false,
-        autoSkillEnabled = false,
-        NoSlowdownEnabled = false,
-        antiFailEnabled = false,
-        noclipEnabled = false,
-        fullbrightEnabled = false,
-        AutoParryEnabled = false,
-        AutoParryV2Enabled = false,
-        KillerAntiBlindEnabled = false,
-        GateToolEnabled = false,
-        InfiniteLungeEnabled = false,
-        FlyEnabled = false,
-        FreeCameraEnabled = false,
-        WalkSpeedEnabled = false,
-        OneHitKillEnabled = false,
-        DestroyPalletsEnabled = false,
-        BreakGeneratorEnabled = false,
-        NoFallEnabled = false,
-        NoTurnLimitEnabled = false
-    }
+    States = {},
+    Tabs = {} -- Добавляем пустую таблицу для вкладок
 }
 
 -- ========== ПОЛЕЗНЫЕ ФУНКЦИИ (из Helpers) ==========
 
 -- Основные функции персонажа
 _G.Nexus.getCharacter = function()
-    return Player.Character
+    return _G.Nexus.Player.Character
 end
 
 _G.Nexus.getHumanoid = function()
-    local char = Player.Character
+    local char = _G.Nexus.getCharacter()
     return char and char:FindFirstChildOfClass("Humanoid")
 end
 
 _G.Nexus.getRootPart = function()
-    local char = Player.Character
+    local char = _G.Nexus.getCharacter()
     return char and char:FindFirstChild("HumanoidRootPart")
 end
 
@@ -95,55 +74,30 @@ _G.Nexus.safeDisconnect = function(conn)
     return nil
 end
 
--- Проверка ролей (нужны для модулей)
-_G.Nexus.IsKiller = function(targetPlayer)
-    targetPlayer = targetPlayer or Player
-    if not targetPlayer.Team then return false end
-    local teamName = targetPlayer.Team.Name:lower()
-    return teamName:find("killer") or teamName == "killer"
-end
-
-_G.Nexus.IsSurvivor = function(targetPlayer)
-    if not targetPlayer or not targetPlayer.Team then return false end
-    local teamName = targetPlayer.Team.Name:lower()
-    return teamName:find("survivor") or teamName == "survivors" or teamName == "survivor"
-end
-
-_G.Nexus.GetRole = function(targetPlayer)
-    targetPlayer = targetPlayer or Player
-    if targetPlayer.Team and targetPlayer.Team.Name then
-        local n = targetPlayer.Team.Name:lower()
-        if n:find("killer") then return "Killer" end
-        if n:find("survivor") then return "Survivor" end
-    end
-    return "Survivor"
-end
-
--- Утилиты (если используются)
-_G.Nexus.Notify = function(title, content, duration)
-    Fluent:Notify({
-        Title = title,
-        Content = content,
-        Duration = duration or 3
-    })
-end
-
-_G.Nexus.FindRemote = function(path)
-    local current = Services.ReplicatedStorage
-    for _, part in ipairs(path:split("/")) do
-        current = current:WaitForChild(part)
-    end
-    return current
-end
-
-_G.Nexus.GetDistance = function(pos1, pos2)
-    if not pos1 or not pos2 then return math.huge end
-    return (pos1 - pos2).Magnitude
-end
-
-_G.Nexus.Clamp = function(value, min, max)
-    return math.max(min, math.min(max, value))
-end
+-- Инициализация States (важно делать это ДО загрузки модулей!)
+_G.Nexus.States = {
+    InstantHealRunning = false,
+    SilentHealRunning = false,
+    autoHealEnabled = false,
+    autoSkillEnabled = false,
+    NoSlowdownEnabled = false,
+    antiFailEnabled = false,
+    noclipEnabled = false,
+    fullbrightEnabled = false,
+    AutoParryEnabled = false,
+    AutoParryV2Enabled = false,
+    KillerAntiBlindEnabled = false,
+    GateToolEnabled = false,
+    InfiniteLungeEnabled = false,
+    FlyEnabled = false,
+    FreeCameraEnabled = false,
+    WalkSpeedEnabled = false,
+    OneHitKillEnabled = false,
+    DestroyPalletsEnabled = false,
+    BreakGeneratorEnabled = false,
+    NoFallEnabled = false,
+    NoTurnLimitEnabled = false
+}
 
 -- ========== ЗАГРУЗКА МОДУЛЕЙ ==========
 
@@ -166,63 +120,79 @@ local function loadModule(url)
     end)
     if success then
         return module
+    else
+        warn("Failed to load module from:", url)
+        return nil
     end
-    return nil
 end
 
--- Параллельная загрузка
-local loaded = 0
-local total = 0
-for name, url in pairs(ModuleUrls) do
-    total = total + 1
-    task.spawn(function()
+-- Загружаем модули последовательно, а не параллельно
+local moduleNames = {"UI", "Survivor", "Killer", "Movement", "Fun", "Visual"}
+if IS_DESKTOP then
+    table.insert(moduleNames, "Binds")
+end
+
+for _, name in ipairs(moduleNames) do
+    local url = ModuleUrls[name]
+    if url then
+        print("Loading module:", name)
         local module = loadModule(url)
         if module then
             _G.Nexus.Modules[name] = module
-            loaded = loaded + 1
+            print("✓ Module loaded:", name)
+        else
+            warn("✗ Failed to load module:", name)
         end
-    end)
+    end
 end
 
--- Ожидание загрузки
-while loaded < total do
-    Services.RunService.Heartbeat:Wait()
-end
-
--- ========== ИНИЦИАЛИЗАЦИЯ ==========
+-- ========== ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ ==========
 
 local function initModule(name)
     local module = _G.Nexus.Modules[name]
     if module and module.Init then
-        return pcall(module.Init, _G.Nexus)
+        local success, err = pcall(function()
+            module.Init(_G.Nexus)
+        end)
+        if success then
+            print("✓ Module initialized:", name)
+            return true
+        else
+            warn("✗ Failed to initialize module", name, ":", err)
+            return false
+        end
+    else
+        warn("✗ Module", name, "not found or has no Init function")
+        return false
     end
-    return false
 end
 
--- Порядок инициализации
-local initOrder = {"UI", "Survivor", "Killer", "Movement", "Fun", "Visual", "Binds"}
+-- Порядок инициализации (UI должен быть первым!)
+local initOrder = {"UI", "Survivor", "Killer", "Movement", "Fun", "Visual"}
+if IS_DESKTOP then
+    table.insert(initOrder, "Binds")
+end
 
 for _, name in ipairs(initOrder) do
-    if _G.Nexus.Modules[name] then
-        initModule(name)
-    end
+    initModule(name)
 end
 
--- Настройка сохранения
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
-InterfaceManager:SetFolder("FluentScriptHub")
-SaveManager:SetFolder("FluentScriptHub/violence-district")
+-- ========== НАСТРОЙКА ИНТЕРФЕЙСА ==========
 
--- Вкладка Settings
 if _G.Nexus.Window then
-    local Tabs = _G.Nexus.Tabs
-    Tabs.Settings = _G.Nexus.Window:AddTab({ Title = "Settings", Icon = "settings" })
+    -- Вкладка Settings (добавляем только если окно создано)
+    _G.Nexus.Tabs.Settings = _G.Nexus.Window:AddTab({ Title = "Settings", Icon = "settings" })
     
-    InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-    SaveManager:BuildConfigSection(Tabs.Settings)
+    -- Настройка сохранения
+    SaveManager:SetLibrary(Fluent)
+    InterfaceManager:SetLibrary(Fluent)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetIgnoreIndexes({})
+    InterfaceManager:SetFolder("FluentScriptHub")
+    SaveManager:SetFolder("FluentScriptHub/violence-district")
+    
+    InterfaceManager:BuildInterfaceSection(_G.Nexus.Tabs.Settings)
+    SaveManager:BuildConfigSection(_G.Nexus.Tabs.Settings)
     
     _G.Nexus.Window:SelectTab(1)
     SaveManager:LoadAutoloadConfig()
@@ -239,12 +209,13 @@ Fluent:Notify({
 -- Очистка при выходе
 Services.Players.PlayerRemoving:Connect(function(leavingPlayer)
     if leavingPlayer == Player then
-        for _, module in pairs(_G.Nexus.Modules) do
-            if module.Cleanup then
+        for name, module in pairs(_G.Nexus.Modules) do
+            if module and module.Cleanup then
                 pcall(module.Cleanup)
             end
         end
     end
 end)
 
+print("Nexus script loaded successfully!")
 return _G.Nexus
