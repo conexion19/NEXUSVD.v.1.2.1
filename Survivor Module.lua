@@ -250,7 +250,7 @@ local function StartInstantHeal()
                     end
                 end
             end
-            task.wait()
+            task.wait() 
         end
     end)
 end
@@ -272,16 +272,19 @@ local function StartSilentHeal()
         while healingStates.silentHealRunning do
             local character = Nexus.getCharacter()
             if not character or not Nexus.getRootPart() then
+                task.wait(0.4) -- Задержка при отсутствии персонажа, снижает нагрузку
                 continue
             end
             
             local humanoid = Nexus.getHumanoid()
             if not humanoid or humanoid.Health <= 0 then
+                task.wait(0.4) -- Задержка при смерти персонажа, снижает нагрузку
                 continue
             end
             
             local currentTime = tick()
             if currentTime - healingStates.lastHealTime < healingStates.healCooldown then
+                task.wait(healingStates.healCooldown) -- Кулдаун между лечениями (0.2 секунды)
                 continue
             end
             
@@ -332,6 +335,8 @@ local function StartSilentHeal()
             else 
                 currentValue = not currentValue 
             end
+            
+            task.wait(0.1) -- Основная задержка цикла, предотвращает спам и снижает нагрузку
         end
         
         pcall(SendStopHealEvent)
@@ -343,6 +348,8 @@ local function StopSilentHeal()
     
     healingStates.silentHealRunning = false
     Nexus.States.SilentHealRunning = false
+    
+    task.wait(0.1) -- Задержка перед очисткой соединений
     
     if Survivor.Connections.silentHeal then
         Nexus.safeDisconnect(Survivor.Connections.silentHeal)
@@ -362,6 +369,7 @@ local function StopSilentHeal()
     
     for i = 1, 2 do
         pcall(SendStopHealEvent)
+        task.wait(0.05) -- Задержка между вызовами SendStopHealEvent
     end
     
     pcall(function()
