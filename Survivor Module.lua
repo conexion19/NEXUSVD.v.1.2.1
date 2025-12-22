@@ -1,4 +1,4 @@
-А почему когда я включаю функицю Instant Heal все игроки начинают друг друга быстро лечить я хочу чтобы только  яих быстро лечил , дай исправленную функцию этого кода - local Nexus = _G.Nexus
+local Nexus = _G.Nexus
 
 local Survivor = {
     Connections = {},
