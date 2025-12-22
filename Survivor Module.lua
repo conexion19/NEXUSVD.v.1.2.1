@@ -616,12 +616,12 @@ function Survivor.Init(nxs)
     
     Tabs.Main:AddParagraph({
         Title = "Hello, " .. Nexus.Player.Name .. "!",
-        Content = "Enjoy using it ♡"
+        Content = "Have a great game — and a Happy New Year! ☃"
     })
 
     -- ========== NO TURN LIMIT ==========
     local NoTurnLimitToggle = Tabs.Main:AddToggle("NoTurnLimit", {
-        Title = "No slowing down", 
+        Title = "No Slowing Down", 
         Description = "No slowing down in speed", 
         Default = false
     })
@@ -682,7 +682,7 @@ function Survivor.Init(nxs)
 
     -- ========== HEAL ==========
     local HealToggle = Tabs.Main:AddToggle("Heal", {
-        Title = "Heal", 
+        Title = "Gamemode", 
         Description = "", 
         Default = false
     })
@@ -784,35 +784,6 @@ function Survivor.Init(nxs)
         end)
     end)
 
-    -- ========== ANTI-FAIL GENERATOR ==========
-    local AntiFailToggle = Tabs.Main:AddToggle("AntiFailGenerator", {
-        Title = "Anti-Fail Generator", 
-        Description = "", 
-        Default = false
-    })
-
-    AntiFailToggle:OnChanged(function(v)
-        Nexus.SafeCallback(function()
-            Nexus.States.antiFailEnabled = v
-            if v then
-                DisableGeneratorFail()
-                Nexus.Player.CharacterAdded:Connect(function(char) 
-                    task.wait(1); 
-                    if Nexus.States.antiFailEnabled then 
-                        DisableGeneratorFail() 
-                    end 
-                end)
-                Survivor.Connections.antiFail = Nexus.Services.RunService.Heartbeat:Connect(function() 
-                    if Nexus.States.antiFailEnabled then 
-                        DisableGeneratorFail() 
-                    end 
-                end)
-            else
-                Nexus.safeDisconnect(Survivor.Connections.antiFail)
-            end
-        end)
-    end)
-
     -- ========== NO FALL ==========
     local NoFallToggle = Tabs.Main:AddToggle("NoFall", {
         Title = "NoFall", 
@@ -848,11 +819,8 @@ function Survivor.Init(nxs)
             end
         end)
     end)
-
-    print("✓ Survivor module initialized")
+    
 end
-
--- ========== CLEANUP ==========
 
 function Survivor.Cleanup()
     -- Отключаем все функции
@@ -862,13 +830,11 @@ function Survivor.Cleanup()
     GateTool.Disable()
     SimpleNoFall.Disable()
     
-    -- Очищаем все соединения
     for key, connection in pairs(Survivor.Connections) do
         Nexus.safeDisconnect(connection)
     end
     Survivor.Connections = {}
-    
-    print("Survivor module cleaned up")
+
 end
 
 return Survivor
