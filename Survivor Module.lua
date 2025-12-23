@@ -5,6 +5,184 @@ local Survivor = {
     States = {}
 }
 
+-- ========== AUTO VICTORY (SURVIVOR) ==========
+
+local AutoVictory = (function()
+    local enabled = false
+    local lastFinishPos = nil
+    local beatSurvivorDone = false
+    local connection = nil
+    
+    local function findExitPosition()
+        local map = Nexus.Services.Workspace:FindFirstChild("Map")
+        if not map then return nil end
+        
+        local exitPos = nil
+        
+        -- Проверка стандартных карт
+        if map:FindFirstChild("RooftopHitbox") or map:FindFirstChild("Rooftop") then
+            exitPos = Vector3.new(3098.16, 454.04, -4918.74)
+            return exitPos
+        end
+        
+        if map:FindFirstChild("HooksMeat") then
+            exitPos = Vector3.new(1546.12, 152.21, -796.72)
+            return exitPos
+        end
+        
+        if map:FindFirstChild("churchbell") then
+            exitPos = Vector3.new(760.98, -20.14, -78.48)
+            return exitPos
+        end
+        
+        -- Поиск по названию
+        local finish = map:FindFirstChild("Finishline") or map:FindFirstChild("FinishLine") or map:FindFirstChild("Fininshline")
+        if finish then
+            if finish:IsA("BasePart") then
+                exitPos = finish.Position
+            elseif finish:IsA("Model") then
+                local part = finish:FindFirstChildWhichIsA("BasePart")
+                if part then exitPos = part.Position end
+            end
+            return exitPos
+        end
+        
+        -- Поиск по имени с "finish"
+        for _, obj in ipairs(map:GetDescendants()) do
+            if obj.Name:lower():find("finish") then
+                if obj:IsA("BasePart") then
+                    exitPos = obj.Position
+                    break
+                elseif obj:IsA("Model") then
+                    local part = obj:FindFirstChildWhichIsA("BasePart")
+                    if part then 
+                        exitPos = part.Position
+                        break
+                    end
+                end
+            end
+        end
+        
+        -- Fallback позиции
+        if not exitPos then
+            for _, obj in ipairs(map:GetDescendants()) do
+                if obj:IsA("MeshPart") and obj.Material == Enum.Material.Limestone then
+                    exitPos = Vector3.new(-947.90, 152.12, -7579.52)
+                    break
+                end
+            end
+        end
+        
+        if not exitPos then
+            for _, obj in ipairs(map:GetDescendants()) do
+                if obj:IsA("MeshPart") and obj.Material == Enum.Material.Leather then
+                    exitPos = Vector3.new(1546.12, 152.21, -796.72)
+                    break
+                end
+            end
+        end
+        
+        return exitPos
+    end
+    
+    local function isSurvivor()
+        -- Проверяем роль выжившего (нужно адаптировать под вашу игру)
+        local character = Nexus.getCharacter()
+        if not character then return false end
+        
+        -- Здесь должна быть логика определения роли
+        -- Временно возвращаем true, предполагая что мы всегда выживший
+        return true
+    end
+    
+    local function teleportToExit()
+        if not enabled then return end
+        
+        local character = Nexus.getCharacter()
+        if not character then return end
+        
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        -- Проверяем роль
+        if not isSurvivor() then return end
+        
+        -- Поиск позиции выхода
+        local exitPos = findExitPosition()
+        if not exitPos then 
+            print("Auto Victory: Exit not found")
+            return 
+        end
+        
+        -- Проверка изменения позиции финиша
+        if lastFinishPos then
+            local dist = (exitPos - lastFinishPos).Magnitude
+            if dist > 50 then
+                beatSurvivorDone = false
+            end
+        end
+        
+        -- Если уже телепортировались, не делать снова
+        if beatSurvivorDone then return end
+        
+        -- Телепортация к финишу
+        root.CFrame = CFrame.new(exitPos + Vector3.new(0, 3, 0))
+        
+        -- Отметить выполнение
+        beatSurvivorDone = true
+        lastFinishPos = exitPos
+        
+        print("Auto Victory: Teleported to exit")
+    end
+    
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.AutoVictoryEnabled = true
+        print("Auto Victory: ON")
+        
+        -- Сбрасываем состояние при включении
+        beatSurvivorDone = false
+        lastFinishPos = nil
+        
+        -- Создаем соединение для периодической проверки
+        if connection then
+            connection:Disconnect()
+        end
+        
+        connection = Nexus.Services.RunService.Heartbeat:Connect(function()
+            if enabled then
+                teleportToExit()
+            end
+        end)
+    end
+    
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.AutoVictoryEnabled = false
+        print("Auto Victory: OFF")
+        
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        
+        beatSurvivorDone = false
+        lastFinishPos = nil
+    end
+    
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        ResetState = function()
+            beatSurvivorDone = false
+            lastFinishPos = nil
+        end
+    }
+end)()
+
 -- ========== NO SLOWDOWN ==========
 
 local NoSlowdown = (function()
@@ -692,6 +870,23 @@ function Survivor.Init(nxs)
         Content = "Have a great game — and a Happy New Year! ☃"
     })
 
+    -- ========== AUTO VICTORY ==========
+    local AutoVictoryToggle = Tabs.Main:AddToggle("AutoVictory", {
+        Title = "Auto Victory (Survivor)", 
+        Description = "Automatically teleports to exit for victory", 
+        Default = false
+    })
+
+    AutoVictoryToggle:OnChanged(function(v) 
+        Nexus.SafeCallback(function()
+            if v then 
+                AutoVictory.Enable() 
+            else 
+                AutoVictory.Disable() 
+            end 
+        end)
+    end)
+
     -- ========== NO SLOWDOWN ==========
     local NoSlowdownToggle = Tabs.Main:AddToggle("NoSlowdown", {
         Title = "No Slowdown + Fast DropPallet", 
@@ -895,6 +1090,7 @@ end
 
 function Survivor.Cleanup()
     -- Отключаем все функции
+    AutoVictory.Disable()
     NoSlowdown.Disable()
     AutoParry.Disable()
     FakeParry.Disable()
