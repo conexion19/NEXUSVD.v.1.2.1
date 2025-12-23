@@ -1,4 +1,4 @@
--- Killer Module - Killer functions for Violence District
+
 local Nexus = _G.Nexus
 
 local Killer = {
@@ -15,8 +15,6 @@ local OneHitKill = (function()
     local basicAttackRemote = nil
     local lastAttackTime = 0
     local attackCooldown = 0.5
-    local originalFireServer = nil
-    local hookEnabled = false
 
     local function GetBasicAttackRemote()
         if not basicAttackRemote then
@@ -28,53 +26,33 @@ local OneHitKill = (function()
     end
 
     local function SetupAttackHook()
-        if hookEnabled then return end
-        
         local remote = GetBasicAttackRemote()
         if not remote then return end
         
         -- Сохраняем оригинальный метод
-        originalFireServer = remote.FireServer
+        local originalFireServer = remote.FireServer
         
-        -- Создаем новую функцию с дублированием атаки
-        local function hookedFireServer(self, ...)
-            local args = {...}
-            local result = originalFireServer(self, unpack(args))
+        -- Заменяем метод
+        remote.FireServer = function(self, ...)
+            local result = originalFireServer(self, ...)
             
-            -- Если OneHitKill включен
-            if enabled then
-                -- Запускаем дублированные атаки
-                for i = 1, 2 do
-                    task.wait(0.5 * i)
-                    if enabled then
-                        pcall(function()
-                            originalFireServer(self, unpack(args))
-                        end)
-                    end
-                end
+            -- Если OneHitKill включен и не в кулдауне
+            if enabled and tick() - lastAttackTime > attackCooldown then
+                lastAttackTime = tick()
+                
+                -- Вызываем дополнительную атаку
+                task.wait(0.01)
+                originalFireServer(self, ...)
             end
             
             return result
         end
-        
-        -- Заменяем метод
-        remote.FireServer = function(self, ...)
-            return hookedFireServer(self, ...)
-        end
-        
-        hookEnabled = true
     end
 
-    local function RemoveAttackHook()
-        if not hookEnabled then return end
-        
-        local remote = GetBasicAttackRemote()
-        if remote and originalFireServer then
-            remote.FireServer = originalFireServer
-        end
-        
-        hookEnabled = false
-        originalFireServer = nil
+    local function GetRole()
+        if not Nexus.Player.Team then return "Survivor" end
+        local teamName = Nexus.Player.Team.Name:lower()
+        return teamName:find("killer") and "Killer" or "Survivor"
     end
 
     local function Enable()
@@ -90,123 +68,18 @@ local OneHitKill = (function()
         enabled = false
         Nexus.States.OneHitKillEnabled = false
         
-        RemoveAttackHook()
+        -- Восстанавливаем оригинальный метод
+        local remote = GetBasicAttackRemote()
+        if remote then
+            -- Переподключаем Remote чтобы восстановить оригинальный метод
+            -- (Игра обычно сама восстанавливает Remote)
+        end
     end
 
     return {
         Enable = Enable,
         Disable = Disable,
         IsEnabled = function() return enabled end
-    }
-end)()
-
--- ========== NO FALL ==========
-
-local NoFall = (function()
-    local enabled = false
-    local originalFallRemote = nil
-    local fallRemote = nil
-    local hookEnabled = false
-
-    local function GetFallRemote()
-        if not fallRemote then
-            pcall(function()
-                -- Пытаемся найти RemoteEvent для падения
-                local remotes = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes")
-                
-                -- Ищем в разных возможных местах
-                if remotes:FindFirstChild("Fall") then
-                    fallRemote = remotes:WaitForChild("Fall")
-                elseif remotes:FindFirstChild("Character") then
-                    local character = remotes:WaitForChild("Character")
-                    if character:FindFirstChild("Fall") then
-                        fallRemote = character:WaitForChild("Fall")
-                    end
-                elseif remotes:FindFirstChild("States") then
-                    local states = remotes:WaitForChild("States")
-                    if states:FindFirstChild("Fall") then
-                        fallRemote = states:WaitForChild("Fall")
-                    end
-                end
-                
-                -- Если не нашли стандартным путем, ищем по всем RemoteEvent
-                if not fallRemote then
-                    for _, remote in ipairs(remotes:GetDescendants()) do
-                        if remote:IsA("RemoteEvent") and remote.Name:lower():find("fall") then
-                            fallRemote = remote
-                            break
-                        end
-                    end
-                end
-            end)
-        end
-        return fallRemote
-    end
-
-    local function SetupNoFallHook()
-        if hookEnabled then return end
-        
-        local remote = GetFallRemote()
-        if not remote then 
-            warn("NoFall: Could not find fall remote")
-            return 
-        end
-        
-        -- Сохраняем оригинальный метод
-        originalFallRemote = remote.FireServer
-        
-        -- Заменяем метод на пустую функцию когда NoFall включен
-        remote.FireServer = function(self, ...)
-            if enabled then
-                -- Полностью блокируем вызов
-                return nil
-            end
-            return originalFallRemote(self, ...)
-        end
-        
-        hookEnabled = true
-        print("NoFall hook installed successfully")
-    end
-
-    local function RemoveNoFallHook()
-        if not hookEnabled then return end
-        
-        local remote = GetFallRemote()
-        if remote and originalFallRemote then
-            remote.FireServer = originalFallRemote
-        end
-        
-        hookEnabled = false
-        originalFallRemote = nil
-    end
-
-    local function Enable()
-        if enabled then return end
-        enabled = true
-        Nexus.States.NoFallEnabled = true
-        
-        SetupNoFallHook()
-    end
-
-    local function Disable()
-        if not enabled then return end
-        enabled = false
-        Nexus.States.NoFallEnabled = false
-        
-        RemoveNoFallHook()
-    end
-
-    -- Автоматическая установка хука при запуске
-    task.spawn(function()
-        task.wait(3)
-        pcall(GetFallRemote)
-    end)
-
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end,
-        SetupHook = SetupNoFallHook
     }
 end)()
 
@@ -1088,7 +961,7 @@ function Killer.Init(nxs)
     if Nexus.IS_DESKTOP then
         local OneHitKillToggle = Tabs.Killer:AddToggle("OneHitKill", {
             Title = "OneHitKill", 
-            Description = "Attack nearby players with one click (Killer only). Duplicates attack 2 times with 0.5s delay.", 
+            Description = "Attack nearby players with one click (Killer only)", 
             Default = false
         })
 
@@ -1102,23 +975,6 @@ function Killer.Init(nxs)
             end)
         end)
     end
-
-    -- ========== NO FALL ==========
-    local NoFallToggle = Tabs.Killer:AddToggle("NoFall", {
-        Title = "No Fall Damage", 
-        Description = "Completely blocks fall damage RemoteEvent calls", 
-        Default = false
-    })
-
-    NoFallToggle:OnChanged(function(v)
-        Nexus.SafeCallback(function()
-            if v then 
-                NoFall.Enable() 
-            else 
-                NoFall.Disable() 
-            end
-        end)
-    end)
 
     -- ========== DESTROY PALLETS ==========
     local DestroyPalletsToggle = Tabs.Killer:AddToggle("DestroyPallets", {
@@ -1311,7 +1167,6 @@ end
 function Killer.Cleanup()
     -- Отключаем все функции
     OneHitKill.Disable()
-    NoFall.Disable()
     NoSlowdown.Disable()
     Hitbox.Disable()
     ThirdPerson.Disable()
