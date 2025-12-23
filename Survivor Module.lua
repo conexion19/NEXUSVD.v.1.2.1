@@ -231,6 +231,125 @@ local AutoParry = (function()
     }
 end)()
 
+-- ========== FAKE PARRY ==========
+
+local FakeParry = (function()
+    local enabled = false
+    local animationId = "rbxassetid://127096285501517"
+    local animationTrack = nil
+    local characterConnection = nil
+    
+    local function stopAnimation()
+        if animationTrack then
+            animationTrack:Stop()
+            animationTrack = nil
+        end
+    end
+    
+    local function startAnimation()
+        local character = Nexus.getCharacter()
+        if not character then return false end
+        
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return false end
+        
+        -- Создаем анимацию
+        local animation = Instance.new("Animation")
+        animation.AnimationId = animationId
+        
+        -- Загружаем и воспроизводим анимацию
+        animationTrack = humanoid:LoadAnimation(animation)
+        if animationTrack then
+            animationTrack:Play()
+            
+            -- Останавливаем при завершении
+            animationTrack.Stopped:Connect(function()
+                animationTrack = nil
+                
+                -- Автоматически перезапускаем анимацию если функция все еще включена
+                if enabled then
+                    task.wait(0.1)
+                    startAnimation()
+                end
+            end)
+            
+            return true
+        end
+        
+        return false
+    end
+    
+    local function setupCharacterListeners()
+        if characterConnection then
+            characterConnection:Disconnect()
+            characterConnection = nil
+        end
+        
+        -- Останавливаем анимацию при смерти
+        local character = Nexus.getCharacter()
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.Died:Connect(stopAnimation)
+            end
+        end
+        
+        -- Автоматически запускаем анимацию при появлении нового персонажа
+        characterConnection = Nexus.Player.CharacterAdded:Connect(function(newCharacter)
+            if enabled then
+                task.wait(1) -- Ждем загрузки персонажа
+                
+                local humanoid = newCharacter:WaitForChild("Humanoid", 5)
+                if humanoid then
+                    -- Останавливаем при смерти
+                    humanoid.Died:Connect(stopAnimation)
+                    
+                    -- Запускаем анимацию
+                    task.wait(0.5)
+                    startAnimation()
+                end
+            end
+        end)
+    end
+    
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.FakeParryEnabled = true
+        print("Fake Parry: ON")
+        
+        -- Настраиваем слушатели для персонажа
+        setupCharacterListeners()
+        
+        -- Пытаемся запустить анимацию
+        if not startAnimation() then
+            print("Fake Parry: Waiting for character to start animation...")
+        end
+    end
+    
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.FakeParryEnabled = false
+        print("Fake Parry: OFF")
+        
+        -- Останавливаем анимацию
+        stopAnimation()
+        
+        -- Отключаем слушатели
+        if characterConnection then
+            characterConnection:Disconnect()
+            characterConnection = nil
+        end
+    end
+    
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end
+    }
+end)()
+
 local healingStates = {
     silentHealRunning = false,
     instantHealRunning = false,
@@ -431,6 +550,7 @@ local function ResetAllHealing()
         Survivor.Connections.autoHeal = nil
     end
 end
+
 -- ========== GATE TOOL ==========
 
 local GateTool = (function()
@@ -573,7 +693,7 @@ function Survivor.Init(nxs)
 
     -- ========== NO SLOWDOWN ==========
     local NoSlowdownToggle = Tabs.Main:AddToggle("NoSlowdown", {
-        Title = "No Slowdown + Fast DropPallet", 
+        Title = "No Slowdown", 
         Description = "Prevents all slowdown effects", 
         Default = false
     })
@@ -618,6 +738,23 @@ function Survivor.Init(nxs)
             end)
         end
     })
+
+    -- ========== FAKE PARRY ==========
+    local FakeParryToggle = Tabs.Main:AddToggle("FakeParry", {
+        Title = "Fake Parry", 
+        Description = "Plays parry animation continuously", 
+        Default = false
+    })
+
+    FakeParryToggle:OnChanged(function(v) 
+        Nexus.SafeCallback(function()
+            if v then 
+                FakeParry.Enable() 
+            else 
+                FakeParry.Disable() 
+            end 
+        end)
+    end)
 
     -- ========== PARRY NO ANIMATION ==========
     local ParryNoAnimationToggle = Tabs.Main:AddToggle("ParryNoAnimation", {
@@ -759,6 +896,7 @@ function Survivor.Cleanup()
     -- Отключаем все функции
     NoSlowdown.Disable()
     AutoParry.Disable()
+    FakeParry.Disable()
     ResetAllHealing()
     GateTool.Disable()
     
