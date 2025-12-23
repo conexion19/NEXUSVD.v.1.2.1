@@ -495,53 +495,90 @@ local GateTool = (function()
 end)()
 
 -- ========== NO FALL ==========
-local SimpleNoFall = (function()
+local NoFall = (function()
     local enabled = false
-    local remote = nil
-    local originalFireServer = nil
-    local loopConnection = nil
+    local originalFallRemote = nil
+    local fallRemote = nil
+    local hookEnabled = false
+
+    local function GetFallRemote()
+        if not fallRemote then
+            pcall(function()
+                -- Пытаемся найти RemoteEvent для падения
+                local remotes = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes")
+                
+                -- Ищем в разных возможных местах
+                if remotes:FindFirstChild("Fall") then
+                    fallRemote = remotes:WaitForChild("Fall")
+                elseif remotes:FindFirstChild("Character") then
+                    local character = remotes:WaitForChild("Character")
+                    if character:FindFirstChild("Fall") then
+                        fallRemote = character:WaitForChild("Fall")
+                    end
+                elseif remotes:FindFirstChild("States") then
+                    local states = remotes:WaitForChild("States")
+                    if states:FindFirstChild("Fall") then
+                        fallRemote = states:WaitForChild("Fall")
+                    end
+                end
+                
+                -- Если не нашли стандартным путем, ищем по всем RemoteEvent
+                if not fallRemote then
+                    for _, remote in ipairs(remotes:GetDescendants()) do
+                        if remote:IsA("RemoteEvent") and remote.Name:lower():find("fall") then
+                            fallRemote = remote
+                            break
+                        end
+                    end
+                end
+            end)
+        end
+        return fallRemote
+    end
+
+    local function SetupNoFallHook()
+        if hookEnabled then return end
+        
+        local remote = GetFallRemote()
+        if not remote then 
+            warn("NoFall: Could not find fall remote")
+            return 
+        end
+        
+        -- Сохраняем оригинальный метод
+        originalFallRemote = remote.FireServer
+        
+        -- Заменяем метод на пустую функцию когда NoFall включен
+        remote.FireServer = function(self, ...)
+            if enabled then
+                -- Полностью блокируем вызов
+                return nil
+            end
+            return originalFallRemote(self, ...)
+        end
+        
+        hookEnabled = true
+        print("NoFall hook installed successfully")
+    end
+
+    local function RemoveNoFallHook()
+        if not hookEnabled then return end
+        
+        local remote = GetFallRemote()
+        if remote and originalFallRemote then
+            remote.FireServer = originalFallRemote
+        end
+        
+        hookEnabled = false
+        originalFallRemote = nil
+    end
 
     local function Enable()
         if enabled then return end
         enabled = true
         Nexus.States.NoFallEnabled = true
         
-        task.spawn(function()
-            remote = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Mechanics"):WaitForChild("Fall")
-            originalFireServer = remote.FireServer
-
-            -- Блокировка через метатаблицу
-            local mt = getrawmetatable(remote)
-            if mt then
-                setreadonly(mt, false)
-                local originalIndex = mt.__index
-                mt.__index = function(self, key)
-                    if key == "FireServer" then
-                        return function(...)
-                            return nil
-                        end
-                    end
-                    return originalIndex(self, key)
-                end
-                setreadonly(mt, true)
-            end
-
-            -- Блокировка прямого вызова
-            remote.FireServer = function(...)
-                return nil
-            end
-
-            -- Мониторинг для защиты от восстановления
-            loopConnection = task.spawn(function()
-                while task.wait(0.3) do
-                    if remote.FireServer == originalFireServer then
-                        remote.FireServer = function(...)
-                            return nil
-                        end
-                    end
-                end
-            end)
-        end)
+        SetupNoFallHook()
     end
 
     local function Disable()
@@ -549,20 +586,20 @@ local SimpleNoFall = (function()
         enabled = false
         Nexus.States.NoFallEnabled = false
         
-        if loopConnection then
-            task.cancel(loopConnection)
-            loopConnection = nil
-        end
-        
-        if remote and originalFireServer then
-            remote.FireServer = originalFireServer
-        end
+        RemoveNoFallHook()
     end
+
+    -- Автоматическая установка хука при запуске
+    task.spawn(function()
+        task.wait(3)
+        pcall(GetFallRemote)
+    end)
 
     return {
         Enable = Enable,
         Disable = Disable,
-        IsEnabled = function() return enabled end
+        IsEnabled = function() return enabled end,
+        SetupHook = SetupNoFallHook
     }
 end)()
 
@@ -786,20 +823,18 @@ function Survivor.Init(nxs)
 
     -- ========== NO FALL ==========
     local NoFallToggle = Tabs.Main:AddToggle("NoFall", {
-        Title = "NoFall", 
-        Description = "", 
+        Title = "No Fall", 
+        Description = "Without slowing down from falling", 
         Default = false
     })
 
-    NoFallToggle:OnChanged(function(v) 
+    NoFallToggle:OnChanged(function(v)
         Nexus.SafeCallback(function()
             if v then 
-                SimpleNoFall.Enable() 
-                Nexus.States.NoFallEnabled = true
+                NoFall.Enable() 
             else 
-                SimpleNoFall.Disable() 
-                Nexus.States.NoFallEnabled = false
-            end 
+                NoFall.Disable() 
+            end
         end)
     end)
 
@@ -827,6 +862,7 @@ function Survivor.Cleanup()
     NoTurnLimit.Disable()
     AutoParry.Disable()
     ResetAllHealing()
+    NoFall.Disable()
     GateTool.Disable()
     SimpleNoFall.Disable()
     
