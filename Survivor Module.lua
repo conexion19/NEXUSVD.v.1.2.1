@@ -1,9 +1,245 @@
- local Nexus = _G.Nexus
+local Nexus = _G.Nexus
 
 local Survivor = {
     Connections = {},
     States = {}
 }
+
+-- ========== CROSSHAIR SYSTEM ==========
+
+local Crosshair = (function()
+    local enabled = false
+    local rainbowEnabled = false
+    local currentType = "crosshair"
+    local screenGui = nil
+    local frame = nil
+    local rainbowConnection = nil
+    
+    -- Настройки прицелов
+    local crosshairTypes = {
+        crosshair = {
+            create = function(parent)
+                local container = Instance.new("Frame")
+                container.Name = "Crosshair"
+                container.BackgroundTransparency = 1
+                container.Size = UDim2.new(0, 20, 0, 20)
+                container.Position = UDim2.new(0.5, -10, 0.5, -10)
+                container.ZIndex = 999
+                
+                -- Вертикальная линия
+                local line1 = Instance.new("Frame")
+                line1.Name = "Line1"
+                line1.BackgroundColor3 = Color3.new(1, 1, 1)
+                line1.BorderSizePixel = 0
+                line1.Size = UDim2.new(0, 2, 0, 12)
+                line1.Position = UDim2.new(0.5, -1, 0.5, -6)
+                line1.Parent = container
+                
+                -- Горизонтальная линия
+                local line2 = Instance.new("Frame")
+                line2.Name = "Line2"
+                line2.BackgroundColor3 = Color3.new(1, 1, 1)
+                line2.BorderSizePixel = 0
+                line2.Size = UDim2.new(0, 12, 0, 2)
+                line2.Position = UDim2.new(0.5, -6, 0.5, -1)
+                line2.Parent = container
+                
+                return container
+            end
+        },
+        
+        dot = {
+            create = function(parent)
+                local container = Instance.new("Frame")
+                container.Name = "Crosshair"
+                container.BackgroundTransparency = 1
+                container.Size = UDim2.new(0, 10, 0, 10)
+                container.Position = UDim2.new(0.5, -5, 0.5, -5)
+                container.ZIndex = 999
+                
+                local dot = Instance.new("Frame")
+                dot.Name = "Dot"
+                dot.BackgroundColor3 = Color3.new(1, 1, 1)
+                dot.BorderSizePixel = 0
+                dot.Size = UDim2.new(1, 0, 1, 0)
+                dot.Position = UDim2.new(0, 0, 0, 0)
+                dot.Parent = container
+                
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(1, 0)
+                corner.Parent = dot
+                
+                return container
+            end
+        },
+        
+        circle = {
+            create = function(parent)
+                local container = Instance.new("Frame")
+                container.Name = "Crosshair"
+                container.BackgroundTransparency = 1
+                container.Size = UDim2.new(0, 16, 0, 16)
+                container.Position = UDim2.new(0.5, -8, 0.5, -8)
+                container.ZIndex = 999
+                
+                local outerCircle = Instance.new("Frame")
+                outerCircle.Name = "OuterCircle"
+                outerCircle.BackgroundColor3 = Color3.new(1, 1, 1)
+                outerCircle.BackgroundTransparency = 0.5
+                outerCircle.BorderSizePixel = 0
+                outerCircle.Size = UDim2.new(1, 0, 1, 0)
+                outerCircle.Position = UDim2.new(0, 0, 0, 0)
+                outerCircle.Parent = container
+                
+                local outerCorner = Instance.new("UICorner")
+                outerCorner.CornerRadius = UDim.new(1, 0)
+                outerCorner.Parent = outerCircle
+                
+                local innerCircle = Instance.new("Frame")
+                innerCircle.Name = "InnerCircle"
+                innerCircle.BackgroundColor3 = Color3.new(0, 0, 0)
+                innerCircle.BorderSizePixel = 0
+                innerCircle.Size = UDim2.new(0, 6, 0, 6)
+                innerCircle.Position = UDim2.new(0.5, -3, 0.5, -3)
+                innerCircle.Parent = container
+                
+                local innerCorner = Instance.new("UICorner")
+                innerCorner.CornerRadius = UDim.new(1, 0)
+                innerCorner.Parent = innerCircle
+                
+                return container
+            end
+        }
+    }
+    
+    local function destroyCrosshair()
+        if frame then
+            frame:Destroy()
+            frame = nil
+        end
+        
+        if rainbowConnection then
+            rainbowConnection:Disconnect()
+            rainbowConnection = nil
+        end
+    end
+    
+    local function createCrosshair()
+        destroyCrosshair()
+        
+        if not enabled then return end
+        
+        -- Создаем ScreenGui если его нет
+        if not screenGui or not screenGui.Parent then
+            screenGui = Instance.new("ScreenGui")
+            screenGui.Name = "NexusCrosshair"
+            screenGui.DisplayOrder = 999
+            screenGui.ResetOnSpawn = false
+            screenGui.IgnoreGuiInset = true
+            screenGui.Parent = Nexus.Player:WaitForChild("PlayerGui")
+        end
+        
+        -- Создаем выбранный тип прицела
+        local crosshairConfig = crosshairTypes[currentType]
+        if crosshairConfig then
+            frame = crosshairConfig.create(screenGui)
+            frame.Parent = screenGui
+        end
+    end
+    
+    local function updateRainbowEffect()
+        if not rainbowEnabled or not frame then
+            if rainbowConnection then
+                rainbowConnection:Disconnect()
+                rainbowConnection = nil
+            end
+            return
+        end
+        
+        if rainbowConnection then
+            rainbowConnection:Disconnect()
+        end
+        
+        rainbowConnection = Nexus.Services.RunService.RenderStepped:Connect(function()
+            if not frame or not rainbowEnabled then return end
+            
+            local time = tick()
+            local hue = (time % 5) / 5  -- 5 секундный цикл
+            local color = Color3.fromHSV(hue, 1, 1)
+            
+            -- Обновляем цвет в зависимости от типа прицела
+            if currentType == "crosshair" then
+                local line1 = frame:FindFirstChild("Line1")
+                local line2 = frame:FindFirstChild("Line2")
+                if line1 then line1.BackgroundColor3 = color end
+                if line2 then line2.BackgroundColor3 = color end
+            elseif currentType == "dot" then
+                local dot = frame:FindFirstChild("Dot")
+                if dot then dot.BackgroundColor3 = color end
+            elseif currentType == "circle" then
+                local outerCircle = frame:FindFirstChild("OuterCircle")
+                if outerCircle then outerCircle.BackgroundColor3 = color end
+            end
+        end)
+    end
+    
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.CrosshairEnabled = true
+        print("Crosshair: ON")
+        
+        createCrosshair()
+        updateRainbowEffect()
+    end
+    
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.CrosshairEnabled = false
+        Nexus.States.RainbowCrosshairEnabled = false
+        print("Crosshair: OFF")
+        
+        destroyCrosshair()
+        
+        if screenGui then
+            screenGui:Destroy()
+            screenGui = nil
+        end
+    end
+    
+    local function setType(typeName)
+        if not crosshairTypes[typeName] then
+            typeName = "crosshair"
+        end
+        
+        currentType = typeName
+        print("Crosshair type set to: " .. typeName)
+        
+        if enabled then
+            createCrosshair()
+            updateRainbowEffect()
+        end
+    end
+    
+    local function toggleRainbow(value)
+        rainbowEnabled = value
+        Nexus.States.RainbowCrosshairEnabled = value
+        print("Rainbow Crosshair: " .. (value and "ON" or "OFF"))
+        
+        updateRainbowEffect()
+    end
+    
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        SetType = setType,
+        GetCurrentType = function() return currentType end,
+        ToggleRainbow = toggleRainbow,
+        IsRainbowEnabled = function() return rainbowEnabled end
+    }
+end)()
 
 -- ========== AUTO VICTORY (SURVIVOR) ==========
 
@@ -870,6 +1106,47 @@ function Survivor.Init(nxs)
         Content = "Have a great game — and a Happy New Year! ☃"
     })
 
+    -- ========== CROSSHAIR ==========
+    local CrosshairToggle = Tabs.Main:AddToggle("Crosshair", {
+        Title = "Crosshair", 
+        Description = "Display crosshair in the center of screen", 
+        Default = false
+    })
+
+    CrosshairToggle:OnChanged(function(v) 
+        Nexus.SafeCallback(function()
+            if v then 
+                Crosshair.Enable() 
+            else 
+                Crosshair.Disable() 
+            end 
+        end)
+    end)
+
+    local CrosshairTypeDropdown = Tabs.Main:AddDropdown("CrosshairType", {
+        Title = "Crosshair Type",
+        Description = "Select crosshair type",
+        Values = {"crosshair", "dot", "circle"},
+        Default = "crosshair",
+        Callback = function(value)
+            Nexus.SafeCallback(function()
+                Crosshair.SetType(value)
+            end)
+        end
+    })
+
+    local RainbowCrosshairToggle = Tabs.Main:AddToggle("RainbowCrosshair", {
+        Title = "Rainbow Crosshair", 
+        Description = "Enable rainbow color effect on crosshair", 
+        Default = false
+    })
+
+    RainbowCrosshairToggle:OnChanged(function(v) 
+        Nexus.SafeCallback(function()
+            Crosshair.ToggleRainbow(v)
+        end)
+    end)
+
     -- ========== AUTO VICTORY ==========
     local AutoVictoryToggle = Tabs.Main:AddToggle("AutoVictory", {
         Title = "Auto Victory (Survivor)", 
@@ -1090,6 +1367,7 @@ end
 
 function Survivor.Cleanup()
     -- Отключаем все функции
+    Crosshair.Disable()
     AutoVictory.Disable()
     NoSlowdown.Disable()
     AutoParry.Disable()
