@@ -16,17 +16,6 @@ do
     container.BorderSizePixel = 0
     container.Parent = background
 
-    -- Левое крыло
-    local leftWing = Instance.new("ImageLabel")
-    leftWing.Name = "LeftWing"
-    leftWing.Size = UDim2.new(0, 150, 0, 200)
-    leftWing.Position = UDim2.new(0, 0, 0.5, -100)
-    leftWing.Image = "rbxassetid://14962421917" -- Можно заменить на ID белых крыльев
-    leftWing.ImageTransparency = 1
-    leftWing.BackgroundTransparency = 1
-    leftWing.ScaleType = Enum.ScaleType.Fit
-    leftWing.Parent = container
-
     -- Текст Nexus Script
     local textLabel = Instance.new("TextLabel")
     textLabel.Name = "NexusText"
@@ -79,21 +68,9 @@ do
             TextStrokeTransparency = 1
         })
         
-        local fadeOutLeftWing = tweenService:Create(leftWing, fadeOutTweenInfo, {
-            ImageTransparency = 1,
-            Position = UDim2.new(0, 0, 0.5, -100)
-        })
-        
-        local fadeOutRightWing = tweenService:Create(rightWing, fadeOutTweenInfo, {
-            ImageTransparency = 1,
-            Position = UDim2.new(1, -150, 0.5, -100)
-        })
-        
         local fadeOutBg = tweenService:Create(background, TweenInfo.new(0.5), {BackgroundTransparency = 1})
         
         fadeOutText:Play()
-        fadeOutLeftWing:Play()
-        fadeOutRightWing:Play()
         
         task.wait(0.3)
         fadeOutBg:Play()
