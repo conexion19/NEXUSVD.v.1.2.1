@@ -7,435 +7,131 @@ do
     screenGui.ResetOnSpawn = false
     screenGui.Parent = game:GetService("CoreGui")
 
-    -- Фон (темный с легкой прозрачностью)
+    -- Фон (прозрачный)
     local background = Instance.new("Frame")
     background.Name = "Background"
     background.Size = UDim2.new(1, 0, 1, 0)
-    background.BackgroundColor3 = Color3.fromRGB(10, 10, 25)
+    background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     background.BackgroundTransparency = 1
     background.BorderSizePixel = 0
     background.Parent = screenGui
 
-    -- Контейнер для всей анимации
+    -- Контейнер для крыльев и текста
     local container = Instance.new("Frame")
     container.Name = "Container"
-    container.Size = UDim2.new(0, 600, 0, 400)
-    container.Position = UDim2.new(0.5, -300, 0.5, -200)
+    container.Size = UDim2.new(0, 400, 0, 300)
+    container.Position = UDim2.new(0.5, -200, 0.5, -150)
     container.BackgroundTransparency = 1
     container.BorderSizePixel = 0
     container.Parent = background
 
-    -- Функция для создания части крыла (пера)
-    local function createFeather(size, position, rotation, parent)
-        local feather = Instance.new("Frame")
-        feather.Size = UDim2.new(0, size.X, 0, size.Y)
-        feather.Position = position
-        feather.Rotation = rotation
-        feather.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        feather.BackgroundTransparency = 1
-        feather.BorderSizePixel = 0
-        feather.Parent = parent
-        
-        -- Создаем UIGradient для красивого перехода
-        local gradient = Instance.new("UIGradient")
-        gradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(0.7, Color3.fromRGB(230, 230, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 200, 255))
-        }
-        gradient.Transparency = NumberSequence.new{
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.3, 0.3),
-            NumberSequenceKeypoint.new(1, 0)
-        }
-        gradient.Rotation = 45
-        gradient.Parent = feather
-        
-        -- Скругление краев (имитация пера)
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(1, 0)
-        corner.Parent = feather
-        
-        return feather
-    end
+    -- Левое крыло
+    local leftWing = Instance.new("ImageLabel")
+    leftWing.Name = "LeftWing"
+    leftWing.Size = UDim2.new(0, 150, 0, 200)
+    leftWing.Position = UDim2.new(0, 0, 0.5, -100)
+    leftWing.Image = "rbxassetid://14962421917" -- Можно заменить на ID белых крыльев
+    leftWing.ImageTransparency = 1
+    leftWing.BackgroundTransparency = 1
+    leftWing.ScaleType = Enum.ScaleType.Fit
+    leftWing.Parent = container
 
-    -- Создаем левое крыло
-    local leftWingContainer = Instance.new("Frame")
-    leftWingContainer.Name = "LeftWingContainer"
-    leftWingContainer.Size = UDim2.new(0, 250, 0, 300)
-    leftWingContainer.Position = UDim2.new(0.2, -125, 0.5, -150)
-    leftWingContainer.BackgroundTransparency = 1
-    leftWingContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-    leftWingContainer.Parent = container
-
-    -- Создаем перья для левого крыла
-    local leftFeathers = {}
-    
-    -- Большие перья (основа крыла)
-    for i = 1, 8 do
-        local feather = createFeather(
-            Vector2.new(80, 15),
-            UDim2.new(0, 70 - i * 8, 0, 40 + i * 15),
-            -30 - i * 5,
-            leftWingContainer
-        )
-        feather.ZIndex = i
-        table.insert(leftFeathers, feather)
-    end
-    
-    -- Средние перья
-    for i = 1, 6 do
-        local feather = createFeather(
-            Vector2.new(60, 12),
-            UDim2.new(0, 100 - i * 10, 0, 30 + i * 18),
-            -40 - i * 8,
-            leftWingContainer
-        )
-        feather.ZIndex = 10 + i
-        table.insert(leftFeathers, feather)
-    end
-    
-    -- Маленькие перья (верх крыла)
-    for i = 1, 4 do
-        local feather = createFeather(
-            Vector2.new(40, 10),
-            UDim2.new(0, 130 - i * 15, 0, 20 + i * 20),
-            -50 - i * 10,
-            leftWingContainer
-        )
-        feather.ZIndex = 20 + i
-        table.insert(leftFeathers, feather)
-    end
-
-    -- Создаем правое крыло
-    local rightWingContainer = Instance.new("Frame")
-    rightWingContainer.Name = "RightWingContainer"
-    rightWingContainer.Size = UDim2.new(0, 250, 0, 300)
-    rightWingContainer.Position = UDim2.new(0.8, -125, 0.5, -150)
-    rightWingContainer.BackgroundTransparency = 1
-    rightWingContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-    rightWingContainer.Parent = container
-
-    -- Создаем перья для правого крыла (зеркально)
-    local rightFeathers = {}
-    
-    -- Большие перья (основа крыла)
-    for i = 1, 8 do
-        local feather = createFeather(
-            Vector2.new(80, 15),
-            UDim2.new(0, 70 + i * 8, 0, 40 + i * 15),
-            30 + i * 5,
-            rightWingContainer
-        )
-        feather.ZIndex = i
-        table.insert(rightFeathers, feather)
-    end
-    
-    -- Средние перья
-    for i = 1, 6 do
-        local feather = createFeather(
-            Vector2.new(60, 12),
-            UDim2.new(0, 100 + i * 10, 0, 30 + i * 18),
-            40 + i * 8,
-            rightWingContainer
-        )
-        feather.ZIndex = 10 + i
-        table.insert(rightFeathers, feather)
-    end
-    
-    -- Маленькие перья (верх крыла)
-    for i = 1, 4 do
-        local feather = createFeather(
-            Vector2.new(40, 10),
-            UDim2.new(0, 130 + i * 15, 0, 20 + i * 20),
-            50 + i * 10,
-            rightWingContainer
-        )
-        feather.ZIndex = 20 + i
-        table.insert(rightFeathers, feather)
-    end
-
-    -- Создаем центральный эффект сияния
-    local glowEffect = Instance.new("Frame")
-    glowEffect.Name = "GlowEffect"
-    glowEffect.Size = UDim2.new(0, 100, 0, 100)
-    glowEffect.Position = UDim2.new(0.5, -50, 0.5, -50)
-    glowEffect.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-    glowEffect.BackgroundTransparency = 1
-    glowEffect.BorderSizePixel = 0
-    glowEffect.Parent = container
-    
-    local glowCorner = Instance.new("UICorner")
-    glowCorner.CornerRadius = UDim.new(1, 0)
-    glowCorner.Parent = glowEffect
-    
-    local glowGradient = Instance.new("UIGradient")
-    glowGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 150, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 220, 255))
-    }
-    glowGradient.Transparency = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 0.8),
-        NumberSequenceKeypoint.new(1, 1)
-    }
-    glowGradient.Parent = glowEffect
+    -- Правое крыло
+    local rightWing = Instance.new("ImageLabel")
+    rightWing.Name = "RightWing"
+    rightWing.Size = UDim2.new(0, 150, 0, 200)
+    rightWing.Position = UDim2.new(1, -150, 0.5, -100)
+    rightWing.Image = "rbxassetid://14962421917"
+    rightWing.ImageTransparency = 1
+    rightWing.BackgroundTransparency = 1
+    rightWing.ScaleType = Enum.ScaleType.Fit
+    rightWing.Rotation = 180
+    rightWing.Parent = container
 
     -- Текст Nexus Script
-    local textContainer = Instance.new("Frame")
-    textContainer.Name = "TextContainer"
-    textContainer.Size = UDim2.new(0.8, 0, 0, 120)
-    textContainer.Position = UDim2.new(0.1, 0, 0.7, 0)
-    textContainer.BackgroundTransparency = 1
-    textContainer.Parent = container
-
-    -- Основной текст
-    local mainText = Instance.new("TextLabel")
-    mainText.Name = "MainText"
-    mainText.Size = UDim2.new(1, 0, 0.6, 0)
-    mainText.Position = UDim2.new(0, 0, 0, 0)
-    mainText.BackgroundTransparency = 1
-    mainText.Text = "NEXUS"
-    mainText.Font = Enum.Font.GothamBlack
-    mainText.TextSize = 56
-    mainText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    mainText.TextTransparency = 1
-    mainText.TextStrokeTransparency = 0.7
-    mainText.TextStrokeColor3 = Color3.fromRGB(80, 120, 255)
-    mainText.ZIndex = 50
-    mainText.Parent = textContainer
-
-    -- Подзаголовок
-    local subText = Instance.new("TextLabel")
-    subText.Name = "SubText"
-    subText.Size = UDim2.new(1, 0, 0.4, 0)
-    subText.Position = UDim2.new(0, 0, 0.6, 0)
-    subText.BackgroundTransparency = 1
-    subText.Text = "Violence District"
-    subText.Font = Enum.Font.GothamMedium
-    subText.TextSize = 24
-    subText.TextColor3 = Color3.fromRGB(200, 200, 255)
-    subText.TextTransparency = 1
-    subText.TextStrokeTransparency = 0.8
-    subText.TextStrokeColor3 = Color3.fromRGB(60, 80, 180)
-    subText.ZIndex = 50
-    subText.Parent = textContainer
-
-    -- Эффект частиц (опционально)
-    local particleContainer = Instance.new("Frame")
-    particleContainer.Name = "ParticleContainer"
-    particleContainer.Size = UDim2.new(1, 0, 1, 0)
-    particleContainer.BackgroundTransparency = 1
-    particleContainer.Parent = container
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Name = "NexusText"
+    textLabel.Size = UDim2.new(1, 0, 0, 60)
+    textLabel.Position = UDim2.new(0, 0, 0.5, -30)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = "NEXUS SCRIPT"
+    textLabel.Font = Enum.Font.GothamBlack
+    textLabel.TextSize = 36
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextTransparency = 1
+    textLabel.TextStrokeTransparency = 0.8
+    textLabel.TextStrokeColor3 = Color3.fromRGB(100, 100, 255)
+    textLabel.Parent = container
 
     -- Анимация появления
     local tweenService = game:GetService("TweenService")
     
-    local function createParticle()
-        local particle = Instance.new("Frame")
-        particle.Size = UDim2.new(0, 4, 0, 4)
-        particle.Position = UDim2.new(math.random(), 0, math.random(), 0)
-        particle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        particle.BackgroundTransparency = 0.7
-        particle.BorderSizePixel = 0
-        particle.Parent = particleContainer
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(1, 0)
-        corner.Parent = particle
-        
-        return particle
-    end
-    
     local function showAnimation()
-        -- Появление фона
-        local bgTween = tweenService:Create(background, TweenInfo.new(0.8), {BackgroundTransparency = 0.4})
+        -- Анимация фона
+        local bgTween = tweenService:Create(background, TweenInfo.new(0.5), {BackgroundTransparency = 0.7})
         bgTween:Play()
         
+        -- Задержка перед появлением крыльев
+        task.wait(0.3)
+        
+        -- Появление крыльев
+        local wingTweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        local leftWingTween = tweenService:Create(leftWing, wingTweenInfo, {ImageTransparency = 0, Position = UDim2.new(0, -20, 0.5, -100)})
+        local rightWingTween = tweenService:Create(rightWing, wingTweenInfo, {ImageTransparency = 0, Position = UDim2.new(1, -130, 0.5, -100)})
+        
+        leftWingTween:Play()
+        rightWingTween:Play()
+        
+        -- Задержка перед текстом
         task.wait(0.5)
         
-        -- Появление центрального свечения
-        local glowTween = tweenService:Create(glowEffect, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundTransparency = 0.7,
-            Size = UDim2.new(0, 150, 0, 150),
-            Position = UDim2.new(0.5, -75, 0.5, -75)
-        })
-        glowTween:Play()
-        
-        -- Появление крыльев (последовательно перья)
-        for i, feather in ipairs(leftFeathers) do
-            local tween = tweenService:Create(feather, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                BackgroundTransparency = 0.2,
-                Position = UDim2.new(
-                    feather.Position.X.Scale,
-                    feather.Position.X.Offset + 20,
-                    feather.Position.Y.Scale,
-                    feather.Position.Y.Offset
-                )
-            })
-            tween:Play()
-            task.wait(0.05)
-        end
-        
-        for i, feather in ipairs(rightFeathers) do
-            local tween = tweenService:Create(feather, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                BackgroundTransparency = 0.2,
-                Position = UDim2.new(
-                    feather.Position.X.Scale,
-                    feather.Position.X.Offset - 20,
-                    feather.Position.Y.Scale,
-                    feather.Position.Y.Offset
-                )
-            })
-            tween:Play()
-            task.wait(0.05)
-        end
-        
-        -- Легкая анимация крыльев (дыхание)
-        task.spawn(function()
-            while true do
-                local breathTween1 = tweenService:Create(leftWingContainer, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                    Rotation = 3
-                })
-                local breathTween2 = tweenService:Create(rightWingContainer, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                    Rotation = -3
-                })
-                
-                breathTween1:Play()
-                breathTween2:Play()
-                task.wait(1.5)
-                
-                breathTween1 = tweenService:Create(leftWingContainer, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                    Rotation = -3
-                })
-                breathTween2 = tweenService:Create(rightWingContainer, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                    Rotation = 3
-                })
-                
-                breathTween1:Play()
-                breathTween2:Play()
-                task.wait(1.5)
-            end
-        end)
-        
-        task.wait(0.5)
-        
-        -- Появление текста с эффектом
-        local mainTextTween = tweenService:Create(mainText, TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        -- Появление текста
+        local textTween = tweenService:Create(textLabel, TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             TextTransparency = 0,
             TextStrokeTransparency = 0.5
         })
+        textTween:Play()
         
-        task.wait(0.3)
-        
-        local subTextTween = tweenService:Create(subText, TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            TextTransparency = 0,
-            TextStrokeTransparency = 0.6
-        })
-        
-        mainTextTween:Play()
+        -- Дрожание текста (эффект)
         task.wait(0.2)
-        subTextTween:Play()
-        
-        -- Эффект мерцания текста
-        task.spawn(function()
-            for _ = 1, 4 do
-                local pulseTween = tweenService:Create(mainText, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                    TextColor3 = Color3.fromRGB(220, 230, 255),
-                    TextStrokeColor3 = Color3.fromRGB(100, 140, 255)
-                })
-                pulseTween:Play()
-                task.wait(0.3)
-                
-                pulseTween = tweenService:Create(mainText, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    TextStrokeColor3 = Color3.fromRGB(80, 120, 255)
-                })
-                pulseTween:Play()
-                task.wait(0.3)
-            end
-        end)
-        
-        -- Создаем частицы
-        for _ = 1, 20 do
-            local particle = createParticle()
-            local particleTween = tweenService:Create(particle, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Position = UDim2.new(particle.Position.X.Scale, particle.Position.X.Offset, 1.2, 0),
-                BackgroundTransparency = 1,
-                Size = UDim2.new(0, 8, 0, 8)
-            })
-            particleTween:Play()
-            game:GetService("Debris"):AddItem(particle, 2.5)
-            task.wait(0.1)
+        for i = 1, 3 do
+            textLabel.Position = UDim2.new(0, 0, 0.5, -30 + math.random(-2, 2))
+            task.wait(0.05)
         end
+        textLabel.Position = UDim2.new(0, 0, 0.5, -30)
         
         -- Ждем 2 секунды
         task.wait(2)
         
-        -- Исчезновение с эффектом
-        local fadeOutInfo = TweenInfo.new(1.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        -- Исчезновение
+        local fadeOutTweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
         
-        -- Исчезает текст
-        local fadeOutMainText = tweenService:Create(mainText, fadeOutInfo, {
+        local fadeOutText = tweenService:Create(textLabel, fadeOutTweenInfo, {
             TextTransparency = 1,
-            TextStrokeTransparency = 1,
-            Position = UDim2.new(0, 0, -0.1, 0)
+            TextStrokeTransparency = 1
         })
         
-        local fadeOutSubText = tweenService:Create(subText, fadeOutInfo, {
-            TextTransparency = 1,
-            TextStrokeTransparency = 1,
-            Position = UDim2.new(0, 0, 0.7, 0)
+        local fadeOutLeftWing = tweenService:Create(leftWing, fadeOutTweenInfo, {
+            ImageTransparency = 1,
+            Position = UDim2.new(0, 0, 0.5, -100)
         })
         
-        -- Исчезают крылья
-        for i, feather in ipairs(leftFeathers) do
-            local featherTween = tweenService:Create(feather, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1,
-                Position = UDim2.new(
-                    feather.Position.X.Scale,
-                    feather.Position.X.Offset - 50,
-                    feather.Position.Y.Scale,
-                    feather.Position.Y.Offset
-                )
-            })
-            featherTween:Play()
-        end
-        
-        for i, feather in ipairs(rightFeathers) do
-            local featherTween = tweenService:Create(feather, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1,
-                Position = UDim2.new(
-                    feather.Position.X.Scale,
-                    feather.Position.X.Offset + 50,
-                    feather.Position.Y.Scale,
-                    feather.Position.Y.Offset
-                )
-            })
-            featherTween:Play()
-        end
-        
-        -- Исчезает свечение
-        local fadeOutGlow = tweenService:Create(glowEffect, fadeOutInfo, {
-            BackgroundTransparency = 1,
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0)
+        local fadeOutRightWing = tweenService:Create(rightWing, fadeOutTweenInfo, {
+            ImageTransparency = 1,
+            Position = UDim2.new(1, -150, 0.5, -100)
         })
         
-        -- Исчезает фон
-        local fadeOutBg = tweenService:Create(background, TweenInfo.new(0.8), {
-            BackgroundTransparency = 1
-        })
+        local fadeOutBg = tweenService:Create(background, TweenInfo.new(0.5), {BackgroundTransparency = 1})
         
-        -- Запускаем анимацию исчезновения
-        fadeOutMainText:Play()
-        fadeOutSubText:Play()
-        fadeOutGlow:Play()
+        fadeOutText:Play()
+        fadeOutLeftWing:Play()
+        fadeOutRightWing:Play()
         
         task.wait(0.3)
         fadeOutBg:Play()
         
         -- Удаляем GUI после анимации
-        task.wait(1.5)
+        task.wait(1)
         screenGui:Destroy()
     end
     
@@ -443,7 +139,7 @@ do
     task.spawn(showAnimation)
     
     -- Ждем завершения анимации перед загрузкой библиотек
-    task.wait(4)
+    task.wait(3.5)
 end
 
 -- ========== ЗАГРУЗКА БИБЛИОТЕК ==========
