@@ -1108,8 +1108,8 @@ function Survivor.Init(nxs)
 
     -- ========== CROSSHAIR ==========
     local CrosshairToggle = Tabs.Main:AddToggle("Crosshair", {
-        Title = "Crosshair", 
-        Description = "Display crosshair in the center of screen", 
+        Title = "Crosshair Flashlight & Gun", 
+        Description = "Display crosshair", 
         Default = false
     })
 
@@ -1166,7 +1166,7 @@ function Survivor.Init(nxs)
 
     -- ========== NO SLOWDOWN ==========
     local NoSlowdownToggle = Tabs.Main:AddToggle("NoSlowdown", {
-        Title = "No Slowdown + Fast DropPallet", 
+        Title = "No Slowdown + Fast DropPallet & Anti-Stun", 
         Description = "Prevents all slowdown effects", 
         Default = false
     })
@@ -1199,7 +1199,7 @@ function Survivor.Init(nxs)
     end)
 
     local AutoParryRangeSlider = Tabs.Main:AddSlider("AutoParryRange", {
-        Title = "ping compensation",
+        Title = "parry distance",
         Description = "",
         Default = 10,
         Min = 0,
@@ -1215,7 +1215,7 @@ function Survivor.Init(nxs)
     -- ========== FAKE PARRY ==========
     local FakeParryToggle = Tabs.Main:AddToggle("FakeParry", {
         Title = "Fake Parry", 
-        Description = "Plays parry animation continuously", 
+        Description = "Plays parry animation", 
         Default = false
     })
 
@@ -1245,7 +1245,7 @@ function Survivor.Init(nxs)
     -- ========== HEAL ==========
     local HealToggle = Tabs.Main:AddToggle("Heal", {
         Title = "Gamemode", 
-        Description = "", 
+        Description = "Heal = 100xp", 
         Default = false
     })
 
@@ -1320,7 +1320,7 @@ function Survivor.Init(nxs)
     -- ========== NO HITBOX ==========
     local NoHitboxToggle = Tabs.Main:AddToggle("NoHitbox", {
         Title = "No Hitbox", 
-        Description = "", 
+        Description = "removes the hitboxes", 
         Default = false
     })
 
@@ -1349,7 +1349,7 @@ function Survivor.Init(nxs)
     -- ========== AUTO PERFECT SKILL ==========
     local AutoSkillToggle = Tabs.Main:AddToggle("AutoPerfectSkill", {
         Title = "Auto Perfect Skill Check", 
-        Description = "automatically clicks in the perfect location", 
+        Description = "always an impeccable skill check", 
         Default = false
     })
 
