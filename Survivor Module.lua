@@ -1,9 +1,11 @@
-local Nexus = _G.Nexus
+ local Nexus = _G.Nexus
 
 local Survivor = {
     Connections = {},
     States = {}
 }
+
+-- ========== AUTO VICTORY (SURVIVOR) ==========
 
 local AutoVictory = (function()
     local enabled = false
@@ -17,6 +19,7 @@ local AutoVictory = (function()
         
         local exitPos = nil
         
+        -- Проверка стандартных карт
         if map:FindFirstChild("RooftopHitbox") or map:FindFirstChild("Rooftop") then
             exitPos = Vector3.new(3098.16, 454.04, -4918.74)
             return exitPos
@@ -32,6 +35,7 @@ local AutoVictory = (function()
             return exitPos
         end
         
+        -- Поиск по названию
         local finish = map:FindFirstChild("Finishline") or map:FindFirstChild("FinishLine") or map:FindFirstChild("Fininshline")
         if finish then
             if finish:IsA("BasePart") then
@@ -43,6 +47,7 @@ local AutoVictory = (function()
             return exitPos
         end
         
+        -- Поиск по имени с "finish"
         for _, obj in ipairs(map:GetDescendants()) do
             if obj.Name:lower():find("finish") then
                 if obj:IsA("BasePart") then
@@ -58,6 +63,7 @@ local AutoVictory = (function()
             end
         end
         
+        -- Fallback позиции
         if not exitPos then
             for _, obj in ipairs(map:GetDescendants()) do
                 if obj:IsA("MeshPart") and obj.Material == Enum.Material.Limestone then
@@ -80,9 +86,12 @@ local AutoVictory = (function()
     end
     
     local function isSurvivor()
+        -- Проверяем роль выжившего (нужно адаптировать под вашу игру)
         local character = Nexus.getCharacter()
         if not character then return false end
         
+        -- Здесь должна быть логика определения роли
+        -- Временно возвращаем true, предполагая что мы всегда выживший
         return true
     end
     
@@ -95,13 +104,17 @@ local AutoVictory = (function()
         local root = character:FindFirstChild("HumanoidRootPart")
         if not root then return end
         
+        -- Проверяем роль
         if not isSurvivor() then return end
         
+        -- Поиск позиции выхода
         local exitPos = findExitPosition()
         if not exitPos then 
+            print("Auto Victory: Exit not found")
             return 
         end
         
+        -- Проверка изменения позиции финиша
         if lastFinishPos then
             local dist = (exitPos - lastFinishPos).Magnitude
             if dist > 50 then
@@ -109,22 +122,30 @@ local AutoVictory = (function()
             end
         end
         
+        -- Если уже телепортировались, не делать снова
         if beatSurvivorDone then return end
         
+        -- Телепортация к финишу
         root.CFrame = CFrame.new(exitPos + Vector3.new(0, 3, 0))
         
+        -- Отметить выполнение
         beatSurvivorDone = true
         lastFinishPos = exitPos
+        
+        print("Auto Victory: Teleported to exit")
     end
     
     local function Enable()
         if enabled then return end
         enabled = true
         Nexus.States.AutoVictoryEnabled = true
+        print("Auto Victory: ON")
         
+        -- Сбрасываем состояние при включении
         beatSurvivorDone = false
         lastFinishPos = nil
         
+        -- Создаем соединение для периодической проверки
         if connection then
             connection:Disconnect()
         end
@@ -140,6 +161,7 @@ local AutoVictory = (function()
         if not enabled then return end
         enabled = false
         Nexus.States.AutoVictoryEnabled = false
+        print("Auto Victory: OFF")
         
         if connection then
             connection:Disconnect()
@@ -161,6 +183,8 @@ local AutoVictory = (function()
     }
 end)()
 
+-- ========== NO SLOWDOWN ==========
+
 local NoSlowdown = (function()
     local enabled = false
     local connection = nil
@@ -169,6 +193,7 @@ local NoSlowdown = (function()
         if enabled then return end
         enabled = true
         Nexus.States.NoSlowdownEnabled = true
+        print("No Slowdown: ON")
         
         local character = Nexus.getCharacter()
         if character then
@@ -177,6 +202,7 @@ local NoSlowdown = (function()
                 humanoid:SetAttribute("NoSlowdown", true)
                 humanoid.WalkSpeed = 16
                 
+                -- Отслеживаем изменения скорости и возвращаем к 16
                 connection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
                     if enabled and humanoid and humanoid.WalkSpeed ~= 16 then
                         humanoid.WalkSpeed = 16
@@ -185,15 +211,17 @@ local NoSlowdown = (function()
             end
         end
         
+        -- Также отслеживаем появление нового персонажа
         local charAddedConn
         charAddedConn = Nexus.Player.CharacterAdded:Connect(function(char)
-            task.wait(0.5)
+            task.wait(0.5) -- Даем время на инициализацию
             if enabled then
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum then
                     hum:SetAttribute("NoSlowdown", true)
                     hum.WalkSpeed = 16
                     
+                    -- Обновляем соединение для нового персонажа
                     if connection then
                         connection:Disconnect()
                     end
@@ -213,6 +241,7 @@ local NoSlowdown = (function()
         if not enabled then return end
         enabled = false
         Nexus.States.NoSlowdownEnabled = false
+        print("No Slowdown: OFF")
         
         if connection then
             connection:Disconnect()
@@ -224,6 +253,7 @@ local NoSlowdown = (function()
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if humanoid then
                 humanoid:SetAttribute("NoSlowdown", nil)
+                -- Не сбрасываем скорость, так как игра сама управляет этим
             end
         end
     end
@@ -235,12 +265,14 @@ local NoSlowdown = (function()
     }
 end)()
 
+-- ========== AUTO PARRY ==========
+
 local AutoParry = (function()
     local spamActive = false
     local RANGE = 10
     local lastCheck = 0
     local CHECK_INTERVAL = 0.1
-    local useRemoteEvent = false
+    local useRemoteEvent = false -- Флаг для переключения между методами
 
     local AttackAnimations = {
         "rbxassetid://110355011987939",
@@ -294,6 +326,7 @@ local AutoParry = (function()
 
     local function PerformParry()
         if useRemoteEvent then
+            -- Используем RemoteEvent "parry"
             pcall(function()
                 if Nexus.Services.ReplicatedStorage.Remotes and 
                    Nexus.Services.ReplicatedStorage.Remotes.Items and
@@ -302,6 +335,7 @@ local AutoParry = (function()
                 end
             end)
         else
+            -- Используем стандартный метод через ЛКМ
             spamActive = true
             Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
             task.spawn(function()
@@ -315,6 +349,7 @@ local AutoParry = (function()
     local function Enable()
         if Nexus.States.AutoParryEnabled then return end
         Nexus.States.AutoParryEnabled = true
+        print("AutoParry Enabled")
         
         Survivor.Connections.AutoParry = Nexus.Services.RunService.Heartbeat:Connect(function()
             if not Nexus.States.AutoParryEnabled then
@@ -347,6 +382,7 @@ local AutoParry = (function()
             Survivor.Connections.AutoParry:Disconnect()
             Survivor.Connections.AutoParry = nil
         end
+        print("AutoParry Disabled")
     end
 
     return {
@@ -355,11 +391,14 @@ local AutoParry = (function()
         IsEnabled = function() return Nexus.States.AutoParryEnabled end,
         SetRange = function(value) 
             RANGE = tonumber(value) or 10
+            print("AutoParry range set to: " .. RANGE)
         end,
         GetRange = function() return RANGE end,
         SetUseRemoteEvent = function(value)
             useRemoteEvent = value
+            print("Parry method set to: " .. (value and "RemoteEvent" or "Mouse Click"))
             
+            -- Перезапускаем AutoParry если он включен
             if Nexus.States.AutoParryEnabled then
                 Disable()
                 task.wait(0.1)
@@ -369,6 +408,8 @@ local AutoParry = (function()
         GetUseRemoteEvent = function() return useRemoteEvent end
     }
 end)()
+
+-- ========== FAKE PARRY ==========
 
 local FakeParry = (function()
     local enabled = false
@@ -390,13 +431,16 @@ local FakeParry = (function()
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if not humanoid then return false end
         
+        -- Создаем анимацию
         local animation = Instance.new("Animation")
         animation.AnimationId = animationId
         
+        -- Загружаем и воспроизводим анимацию один раз
         animationTrack = humanoid:LoadAnimation(animation)
         if animationTrack then
             animationTrack:Play()
             
+            -- Останавливаем при завершении и очищаем
             animationTrack.Stopped:Connect(function()
                 animationTrack = nil
             end)
@@ -413,6 +457,7 @@ local FakeParry = (function()
             characterConnection = nil
         end
         
+        -- Останавливаем анимацию при смерти
         local character = Nexus.getCharacter()
         if character then
             local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -421,14 +466,17 @@ local FakeParry = (function()
             end
         end
         
+        -- Автоматически запускаем анимацию при появлении нового персонажа
         characterConnection = Nexus.Player.CharacterAdded:Connect(function(newCharacter)
             if enabled then
-                task.wait(1)
+                task.wait(1) -- Ждем загрузки персонажа
                 
                 local humanoid = newCharacter:WaitForChild("Humanoid", 5)
                 if humanoid then
+                    -- Останавливаем при смерти
                     humanoid.Died:Connect(stopAnimation)
                     
+                    -- Запускаем анимацию один раз
                     task.wait(0.5)
                     startAnimation()
                 end
@@ -440,10 +488,14 @@ local FakeParry = (function()
         if enabled then return end
         enabled = true
         Nexus.States.FakeParryEnabled = true
+        print("Fake Parry: ON")
         
+        -- Настраиваем слушатели для персонажа
         setupCharacterListeners()
         
+        -- Запускаем анимацию один раз
         if not startAnimation() then
+            print("Fake Parry: Waiting for character to start animation...")
         end
     end
     
@@ -451,9 +503,12 @@ local FakeParry = (function()
         if not enabled then return end
         enabled = false
         Nexus.States.FakeParryEnabled = false
+        print("Fake Parry: OFF")
         
+        -- Останавливаем анимацию
         stopAnimation()
         
+        -- Отключаем слушатели
         if characterConnection then
             characterConnection:Disconnect()
             characterConnection = nil
@@ -474,198 +529,12 @@ local FakeParry = (function()
     }
 end)()
 
-local Crosshair = (function()
-    local enabled = false
-    local crosshairConnection = nil
-    local drawingObjects = {}
-    local crosshairType = "crosshair"
-    local rgbEnabled = false
-    local rgbHue = 0
-    
-    local function safeRemoveDrawings()
-        for _, obj in pairs(drawingObjects) do
-            if obj and typeof(obj) == "userdata" then
-                pcall(function()
-                    obj:Remove()
-                end)
-            end
-        end
-        drawingObjects = {}
-    end
-    
-    local function getRGBColor()
-        if not rgbEnabled then
-            return Color3.fromRGB(255, 255, 255)
-        end
-        
-        rgbHue = (rgbHue + 0.01) % 1
-        local r, g, b = Color3.fromHSV(rgbHue, 1, 1):ToRGB()
-        return Color3.new(r, g, b)
-    end
-    
-    local function createCrosshair()
-        safeRemoveDrawings()
-        
-        local centerX = game.Workspace.CurrentCamera.ViewportSize.X / 2
-        local centerY = game.Workspace.CurrentCamera.ViewportSize.Y / 2
-        
-        if crosshairType == "dot" then
-            local dot = Drawing.new("Circle")
-            dot.Visible = true
-            dot.Radius = 3
-            dot.Thickness = 2
-            dot.Color = getRGBColor()
-            dot.Filled = true
-            dot.Position = Vector2.new(centerX, centerY)
-            table.insert(drawingObjects, dot)
-            
-        elseif crosshairType == "circle" then
-            local circle = Drawing.new("Circle")
-            circle.Visible = true
-            circle.Radius = 8
-            circle.Thickness = 2
-            circle.Color = getRGBColor()
-            circle.Filled = false
-            circle.Position = Vector2.new(centerX, centerY)
-            table.insert(drawingObjects, circle)
-            
-        elseif crosshairType == "crosshair" then
-            local crossLength = 12
-            local crossThickness = 2
-            
-            local line1 = Drawing.new("Line")
-            line1.Visible = true
-            line1.Thickness = crossThickness
-            line1.Color = getRGBColor()
-            line1.From = Vector2.new(centerX - crossLength, centerY)
-            line1.To = Vector2.new(centerX + crossLength, centerY)
-            table.insert(drawingObjects, line1)
-            
-            local line2 = Drawing.new("Line")
-            line2.Visible = true
-            line2.Thickness = crossThickness
-            line2.Color = getRGBColor()
-            line2.From = Vector2.new(centerX, centerY - crossLength)
-            line2.To = Vector2.new(centerX, centerY + crossLength)
-            table.insert(drawingObjects, line2)
-            
-        elseif crosshairType == "square" then
-            local squareSize = 8
-            
-            local square = Drawing.new("Square")
-            square.Visible = true
-            square.Thickness = 2
-            square.Color = getRGBColor()
-            square.Filled = false
-            square.Position = Vector2.new(centerX - squareSize/2, centerY - squareSize/2)
-            square.Size = Vector2.new(squareSize, squareSize)
-            table.insert(drawingObjects, square)
-            
-        elseif crosshairType == "triangle" then
-            local triangleSize = 10
-            
-            local point1 = Vector2.new(centerX, centerY - triangleSize)
-            local point2 = Vector2.new(centerX - triangleSize, centerY + triangleSize)
-            local point3 = Vector2.new(centerX + triangleSize, centerY + triangleSize)
-            
-            local line1 = Drawing.new("Line")
-            line1.Visible = true
-            line1.Thickness = 2
-            line1.Color = getRGBColor()
-            line1.From = point1
-            line1.To = point2
-            table.insert(drawingObjects, line1)
-            
-            local line2 = Drawing.new("Line")
-            line2.Visible = true
-            line2.Thickness = 2
-            line2.Color = getRGBColor()
-            line2.From = point2
-            line2.To = point3
-            table.insert(drawingObjects, line2)
-            
-            local line3 = Drawing.new("Line")
-            line3.Visible = true
-            line3.Thickness = 2
-            line3.Color = getRGBColor()
-            line3.From = point3
-            line3.To = point1
-            table.insert(drawingObjects, line3)
-        end
-    end
-    
-    local function updateCrosshair()
-        if #drawingObjects == 0 then
-            createCrosshair()
-        end
-        
-        for _, obj in pairs(drawingObjects) do
-            obj.Color = getRGBColor()
-        end
-    end
-    
-    local function Enable()
-        if enabled then return end
-        enabled = true
-        Nexus.States.CrosshairEnabled = true
-        
-        createCrosshair()
-        
-        crosshairConnection = Nexus.Services.RunService.RenderStepped:Connect(function()
-            if not enabled then return end
-            updateCrosshair()
-        end)
-    end
-    
-    local function Disable()
-        if not enabled then return end
-        enabled = false
-        Nexus.States.CrosshairEnabled = false
-        
-        safeRemoveDrawings()
-        
-        if crosshairConnection then
-            crosshairConnection:Disconnect()
-            crosshairConnection = nil
-        end
-    end
-    
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end,
-        SetCrosshairType = function(value)
-            crosshairType = value
-            if enabled then
-                createCrosshair()
-            end
-        end,
-        GetCrosshairType = function() return crosshairType end,
-        SetRGBEnabled = function(value)
-            rgbEnabled = value
-        end,
-        GetRGBEnabled = function() return rgbEnabled end
-    }
-end)()
-
 local healingStates = {
     silentHealRunning = false,
     instantHealRunning = false,
     lastHealTime = 0,
     healCooldown = 0.2
 }
-
-local function SendStopHealEvent()
-    pcall(function()
-        if Nexus.Services.ReplicatedStorage.Remotes and 
-           Nexus.Services.ReplicatedStorage.Remotes.Healing then
-            local healAnimRemote = Nexus.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
-            if healAnimRemote then
-                healAnimRemote:FireServer(false)
-            end
-        end
-    end)
-end
 
 local function StartInstantHeal()
     Nexus.States.InstantHealRunning = true
@@ -729,19 +598,19 @@ local function StartSilentHeal()
         while healingStates.silentHealRunning do
             local character = Nexus.getCharacter()
             if not character or not Nexus.getRootPart() then
-                task.wait(0.4)
+                task.wait(0.4) -- Задержка при отсутствии персонажа, снижает нагрузку
                 continue
             end
             
             local humanoid = Nexus.getHumanoid()
             if not humanoid or humanoid.Health <= 0 then
-                task.wait(0.4)
+                task.wait(0.4) -- Задержка при смерти персонажа, снижает нагрузку
                 continue
             end
             
             local currentTime = tick()
             if currentTime - healingStates.lastHealTime < healingStates.healCooldown then
-                task.wait(healingStates.healCooldown)
+                task.wait(healingStates.healCooldown) -- Кулдаун между лечениями (0.2 секунды)
                 continue
             end
             
@@ -767,6 +636,7 @@ local function StartSilentHeal()
                                     Nexus.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
                                     healingStates.lastHealTime = tick()
                                     
+                                    -- Вызываем HealAnim с аргументом false
                                     local healAnimRemote = Nexus.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
                                     if healAnimRemote then
                                         healAnimRemote:FireServer(false)
@@ -792,7 +662,7 @@ local function StartSilentHeal()
                 currentValue = not currentValue 
             end
             
-            task.wait(0.1)
+            task.wait(0.1) -- Основная задержка цикла, предотвращает спам и снижает нагрузку
         end
         
         pcall(SendStopHealEvent)
@@ -805,13 +675,14 @@ local function StopSilentHeal()
     healingStates.silentHealRunning = false
     Nexus.States.SilentHealRunning = false
     
-    task.wait(0.1)
+    task.wait(0.1) -- Задержка перед очисткой соединений
     
     if Survivor.Connections.silentHeal then
         Nexus.safeDisconnect(Survivor.Connections.silentHeal)
         Survivor.Connections.silentHeal = nil
     end
     
+    -- 2 раза вызываем HealAnim с аргументом false при выключении функции
     pcall(function()
         if Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Healing then
             local healAnimRemote = Nexus.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
@@ -824,7 +695,7 @@ local function StopSilentHeal()
     
     for i = 1, 2 do
         pcall(SendStopHealEvent)
-        task.wait(0.05)
+        task.wait(0.05) -- Задержка между вызовами SendStopHealEvent
     end
     
     pcall(function()
@@ -858,6 +729,8 @@ local function ResetAllHealing()
         Survivor.Connections.autoHeal = nil
     end
 end
+
+-- ========== GATE TOOL ==========
 
 local GateTool = (function()
     local toolInstance = nil
@@ -944,6 +817,8 @@ local GateTool = (function()
     return {Enable=Enable, Disable=Disable}
 end)()
 
+-- ========== AUTO SKILL CHECK ==========
+
 local function FindSkillCheckGUI()
     local PlayerGui = Nexus.Player:WaitForChild("PlayerGui")
     local skillCheckGui = PlayerGui:FindFirstChild("SkillCheckPromptGui")
@@ -982,6 +857,8 @@ local function PerformPerfectSkillCheck()
     return false
 end
 
+-- ========== MODULE INITIALIZATION ==========
+
 function Survivor.Init(nxs)
     Nexus = nxs
     
@@ -990,9 +867,10 @@ function Survivor.Init(nxs)
     
     Tabs.Main:AddParagraph({
         Title = "Hello, " .. Nexus.Player.Name .. "!",
-        Content = "Have a great game"
+        Content = "Have a great game — and a Happy New Year! ☃"
     })
 
+    -- ========== AUTO VICTORY ==========
     local AutoVictoryToggle = Tabs.Main:AddToggle("AutoVictory", {
         Title = "Auto Victory (Survivor)", 
         Description = "Automatically teleports to exit for victory", 
@@ -1009,6 +887,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    -- ========== NO SLOWDOWN ==========
     local NoSlowdownToggle = Tabs.Main:AddToggle("NoSlowdown", {
         Title = "No Slowdown + Fast DropPallet", 
         Description = "Prevents all slowdown effects", 
@@ -1025,6 +904,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    -- ========== AUTO PARRY ==========
     local AutoParryToggle = Tabs.Main:AddToggle("AutoParry", {
         Title = "AutoParry", 
         Description = "automatic parry of attacks", 
@@ -1055,6 +935,7 @@ function Survivor.Init(nxs)
         end
     })
 
+    -- ========== FAKE PARRY ==========
     local FakeParryToggle = Tabs.Main:AddToggle("FakeParry", {
         Title = "Fake Parry", 
         Description = "Plays parry animation continuously", 
@@ -1071,6 +952,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    -- ========== PARRY NO ANIMATION ==========
     local ParryNoAnimationToggle = Tabs.Main:AddToggle("ParryNoAnimation", {
         Title = "Parry no animation", 
         Description = "Use RemoteEvent instead of mouse click for parry", 
@@ -1083,47 +965,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
-    local CrosshairToggle = Tabs.Main:AddToggle("Crosshair", {
-        Title = "Crosshair", 
-        Description = "Simple custom crosshair", 
-        Default = false
-    })
-
-    CrosshairToggle:OnChanged(function(v) 
-        Nexus.SafeCallback(function()
-            if v then 
-                Crosshair.Enable() 
-            else 
-                Crosshair.Disable() 
-            end 
-        end)
-    end)
-
-    local CrosshairTypeDropdown = Tabs.Main:AddDropdown("CrosshairType", {
-        Title = "Crosshair Type",
-        Values = {"dot", "circle", "crosshair", "square", "triangle"},
-        Multi = false,
-        Default = "crosshair",
-    })
-
-    CrosshairTypeDropdown:OnChanged(function(value)
-        Nexus.SafeCallback(function()
-            Crosshair.SetCrosshairType(value)
-        end)
-    end)
-
-    local CrosshairRGBToggle = Tabs.Main:AddToggle("CrosshairRGB", {
-        Title = "RGB Crosshair", 
-        Description = "Rainbow color effect for crosshair", 
-        Default = false
-    })
-
-    CrosshairRGBToggle:OnChanged(function(v) 
-        Nexus.SafeCallback(function()
-            Crosshair.SetRGBEnabled(v)
-        end)
-    end)
-
+    -- ========== HEAL ==========
     local HealToggle = Tabs.Main:AddToggle("Heal", {
         Title = "Gamemode", 
         Description = "", 
@@ -1147,6 +989,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    -- ========== INSTANT HEAL ==========
     local InstantHealToggle = Tabs.Main:AddToggle("InstantHeal", {
         Title = "Instant Heal", 
         Description = "instant treatment", 
@@ -1163,6 +1006,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    -- ========== SILENT HEAL ==========
     local SilentHealToggle = Tabs.Main:AddToggle("SilentHeal", {
         Title = "Silent Heal", 
         Description = "Heals all players anywhere on the map", 
@@ -1179,6 +1023,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    -- ========== GATE TOOL ==========
     local GateToolToggle = Tabs.Main:AddToggle("GateTool", {
         Title = "Gate Tool", 
         Description = "", 
@@ -1195,6 +1040,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    -- ========== NO HITBOX ==========
     local NoHitboxToggle = Tabs.Main:AddToggle("NoHitbox", {
         Title = "No Hitbox", 
         Description = "", 
@@ -1223,6 +1069,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    -- ========== AUTO PERFECT SKILL ==========
     local AutoSkillToggle = Tabs.Main:AddToggle("AutoPerfectSkill", {
         Title = "Auto Perfect Skill Check", 
         Description = "automatically clicks in the perfect location", 
@@ -1242,11 +1089,11 @@ function Survivor.Init(nxs)
 end
 
 function Survivor.Cleanup()
+    -- Отключаем все функции
     AutoVictory.Disable()
     NoSlowdown.Disable()
     AutoParry.Disable()
     FakeParry.Disable()
-    Crosshair.Disable()
     ResetAllHealing()
     GateTool.Disable()
     
