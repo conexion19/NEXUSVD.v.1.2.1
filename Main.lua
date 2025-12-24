@@ -33,9 +33,9 @@ do
     nexusText.Size = UDim2.new(1, 0, 1, 0)
     nexusText.Position = UDim2.new(0, 0, 0, 0)
     nexusText.BackgroundTransparency = 1
-    nexusText.Text = "NEXUS"
+    nexusText.Text = "NEXUS SCRIPT"
     nexusText.Font = Enum.Font.GothamBlack
-    nexusText.TextSize = 72
+    nexusText.TextSize = 60
     nexusText.TextColor3 = Color3.fromRGB(255, 255, 255)
     nexusText.TextTransparency = 1
     nexusText.ZIndex = 10
@@ -49,7 +49,7 @@ do
     violenceText.BackgroundTransparency = 1
     violenceText.Text = "Violence District"
     violenceText.Font = Enum.Font.GothamMedium
-    violenceText.TextSize = 36
+    violenceText.TextSize = 55
     violenceText.TextColor3 = Color3.fromRGB(255, 255, 255)
     violenceText.TextTransparency = 1
     violenceText.ZIndex = 10
