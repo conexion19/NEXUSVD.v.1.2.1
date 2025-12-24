@@ -1,3 +1,148 @@
+-- ========== ПРЕДВАРИТЕЛЬНЫЙ ЭКРАН ЗАГРУЗКИ ==========
+do
+    -- Создаем GUI для предзагрузки
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "NexusPreload"
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = game:GetService("CoreGui")
+
+    -- Фон (прозрачный)
+    local background = Instance.new("Frame")
+    background.Name = "Background"
+    background.Size = UDim2.new(1, 0, 1, 0)
+    background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    background.BackgroundTransparency = 1
+    background.BorderSizePixel = 0
+    background.Parent = screenGui
+
+    -- Контейнер для крыльев и текста
+    local container = Instance.new("Frame")
+    container.Name = "Container"
+    container.Size = UDim2.new(0, 400, 0, 300)
+    container.Position = UDim2.new(0.5, -200, 0.5, -150)
+    container.BackgroundTransparency = 1
+    container.BorderSizePixel = 0
+    container.Parent = background
+
+    -- Левое крыло
+    local leftWing = Instance.new("ImageLabel")
+    leftWing.Name = "LeftWing"
+    leftWing.Size = UDim2.new(0, 150, 0, 200)
+    leftWing.Position = UDim2.new(0, 0, 0.5, -100)
+    leftWing.Image = "rbxassetid://14962421917" -- Можно заменить на ID белых крыльев
+    leftWing.ImageTransparency = 1
+    leftWing.BackgroundTransparency = 1
+    leftWing.ScaleType = Enum.ScaleType.Fit
+    leftWing.Parent = container
+
+    -- Правое крыло
+    local rightWing = Instance.new("ImageLabel")
+    rightWing.Name = "RightWing"
+    rightWing.Size = UDim2.new(0, 150, 0, 200)
+    rightWing.Position = UDim2.new(1, -150, 0.5, -100)
+    rightWing.Image = "rbxassetid://14962421917"
+    rightWing.ImageTransparency = 1
+    rightWing.BackgroundTransparency = 1
+    rightWing.ScaleType = Enum.ScaleType.Fit
+    rightWing.Rotation = 180
+    rightWing.Parent = container
+
+    -- Текст Nexus Script
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Name = "NexusText"
+    textLabel.Size = UDim2.new(1, 0, 0, 60)
+    textLabel.Position = UDim2.new(0, 0, 0.5, -30)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = "NEXUS SCRIPT"
+    textLabel.Font = Enum.Font.GothamBlack
+    textLabel.TextSize = 36
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextTransparency = 1
+    textLabel.TextStrokeTransparency = 0.8
+    textLabel.TextStrokeColor3 = Color3.fromRGB(100, 100, 255)
+    textLabel.Parent = container
+
+    -- Анимация появления
+    local tweenService = game:GetService("TweenService")
+    
+    local function showAnimation()
+        -- Анимация фона
+        local bgTween = tweenService:Create(background, TweenInfo.new(0.5), {BackgroundTransparency = 0.7})
+        bgTween:Play()
+        
+        -- Задержка перед появлением крыльев
+        task.wait(0.3)
+        
+        -- Появление крыльев
+        local wingTweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        local leftWingTween = tweenService:Create(leftWing, wingTweenInfo, {ImageTransparency = 0, Position = UDim2.new(0, -20, 0.5, -100)})
+        local rightWingTween = tweenService:Create(rightWing, wingTweenInfo, {ImageTransparency = 0, Position = UDim2.new(1, -130, 0.5, -100)})
+        
+        leftWingTween:Play()
+        rightWingTween:Play()
+        
+        -- Задержка перед текстом
+        task.wait(0.5)
+        
+        -- Появление текста
+        local textTween = tweenService:Create(textLabel, TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            TextTransparency = 0,
+            TextStrokeTransparency = 0.5
+        })
+        textTween:Play()
+        
+        -- Дрожание текста (эффект)
+        task.wait(0.2)
+        for i = 1, 3 do
+            textLabel.Position = UDim2.new(0, 0, 0.5, -30 + math.random(-2, 2))
+            task.wait(0.05)
+        end
+        textLabel.Position = UDim2.new(0, 0, 0.5, -30)
+        
+        -- Ждем 2 секунды
+        task.wait(2)
+        
+        -- Исчезновение
+        local fadeOutTweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        
+        local fadeOutText = tweenService:Create(textLabel, fadeOutTweenInfo, {
+            TextTransparency = 1,
+            TextStrokeTransparency = 1
+        })
+        
+        local fadeOutLeftWing = tweenService:Create(leftWing, fadeOutTweenInfo, {
+            ImageTransparency = 1,
+            Position = UDim2.new(0, 0, 0.5, -100)
+        })
+        
+        local fadeOutRightWing = tweenService:Create(rightWing, fadeOutTweenInfo, {
+            ImageTransparency = 1,
+            Position = UDim2.new(1, -150, 0.5, -100)
+        })
+        
+        local fadeOutBg = tweenService:Create(background, TweenInfo.new(0.5), {BackgroundTransparency = 1})
+        
+        fadeOutText:Play()
+        fadeOutLeftWing:Play()
+        fadeOutRightWing:Play()
+        
+        task.wait(0.3)
+        fadeOutBg:Play()
+        
+        -- Удаляем GUI после анимации
+        task.wait(1)
+        screenGui:Destroy()
+    end
+    
+    -- Запускаем анимацию в отдельном потоке
+    task.spawn(showAnimation)
+    
+    -- Ждем завершения анимации перед загрузкой библиотек
+    task.wait(3.5)
+end
+
+-- ========== ЗАГРУЗКА БИБЛИОТЕК ==========
 local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/zawerex/govno435345/refs/heads/main/g"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
