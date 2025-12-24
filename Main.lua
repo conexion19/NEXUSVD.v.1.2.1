@@ -7,15 +7,6 @@ do
     screenGui.ResetOnSpawn = false
     screenGui.Parent = game:GetService("CoreGui")
 
-    -- Фон (прозрачный)
-    local background = Instance.new("Frame")
-    background.Name = "Background"
-    background.Size = UDim2.new(1, 0, 1, 0)
-    background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    background.BackgroundTransparency = 1
-    background.BorderSizePixel = 0
-    background.Parent = screenGui
-
     -- Контейнер для крыльев и текста
     local container = Instance.new("Frame")
     container.Name = "Container"
@@ -36,18 +27,6 @@ do
     leftWing.ScaleType = Enum.ScaleType.Fit
     leftWing.Parent = container
 
-    -- Правое крыло
-    local rightWing = Instance.new("ImageLabel")
-    rightWing.Name = "RightWing"
-    rightWing.Size = UDim2.new(0, 150, 0, 200)
-    rightWing.Position = UDim2.new(1, -150, 0.5, -100)
-    rightWing.Image = "rbxassetid://14962421917"
-    rightWing.ImageTransparency = 1
-    rightWing.BackgroundTransparency = 1
-    rightWing.ScaleType = Enum.ScaleType.Fit
-    rightWing.Rotation = 180
-    rightWing.Parent = container
-
     -- Текст Nexus Script
     local textLabel = Instance.new("TextLabel")
     textLabel.Name = "NexusText"
@@ -59,7 +38,7 @@ do
     textLabel.TextSize = 36
     textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     textLabel.TextTransparency = 1
-    textLabel.TextStrokeTransparency = 0.8
+    textLabel.TextStrokeTransparency = 0.5
     textLabel.TextStrokeColor3 = Color3.fromRGB(100, 100, 255)
     textLabel.Parent = container
 
@@ -70,17 +49,6 @@ do
         -- Анимация фона
         local bgTween = tweenService:Create(background, TweenInfo.new(0.5), {BackgroundTransparency = 0.7})
         bgTween:Play()
-        
-        -- Задержка перед появлением крыльев
-        task.wait(0.3)
-        
-        -- Появление крыльев
-        local wingTweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        local leftWingTween = tweenService:Create(leftWing, wingTweenInfo, {ImageTransparency = 0, Position = UDim2.new(0, -20, 0.5, -100)})
-        local rightWingTween = tweenService:Create(rightWing, wingTweenInfo, {ImageTransparency = 0, Position = UDim2.new(1, -130, 0.5, -100)})
-        
-        leftWingTween:Play()
-        rightWingTween:Play()
         
         -- Задержка перед текстом
         task.wait(0.5)
