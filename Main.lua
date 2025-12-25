@@ -7,26 +7,6 @@ do
     screenGui.ResetOnSpawn = false
     screenGui.Parent = game:GetService("CoreGui")
 
-    -- Главный контейнер для текста и снежинок
-    local mainContainer = Instance.new("Frame")
-    mainContainer.Name = "MainContainer"
-    mainContainer.Size = UDim2.new(0, 500, 0, 150)
-    mainContainer.Position = UDim2.new(0.5, -250, 0.5, -75)
-    mainContainer.BackgroundTransparency = 1
-    mainContainer.BorderSizePixel = 0
-    mainContainer.ClipsDescendants = true
-    mainContainer.Parent = screenGui
-
-    -- Контейнер для снежинок (внутри основного контейнера)
-    local snowContainer = Instance.new("Frame")
-    snowContainer.Name = "SnowContainer"
-    snowContainer.Size = UDim2.new(1, 0, 1, 0)
-    snowContainer.Position = UDim2.new(0, 0, 0, 0)
-    snowContainer.BackgroundTransparency = 1
-    snowContainer.BorderSizePixel = 0
-    snowContainer.ZIndex = 1
-    snowContainer.Parent = mainContainer
-
     -- Текст NEXUS
     local nexusText = Instance.new("TextLabel")
     nexusText.Name = "NexusText"
@@ -54,70 +34,6 @@ do
     violenceText.TextTransparency = 1
     violenceText.ZIndex = 10
     violenceText.Parent = mainContainer
-
-    -- Функция создания маленькой снежинки
-    local function createSnowflake()
-        local snowflake = Instance.new("Frame")
-        local size = math.random(3, 8)  -- Очень маленькие снежинки
-        snowflake.Size = UDim2.new(0, size, 0, size)
-        snowflake.Position = UDim2.new(
-            math.random(),  -- X позиция (0-1)
-            math.random(-20, 20),  -- Случайное смещение
-            0,  -- Начинаем сверху
-            -size  -- Начальная позиция Y
-        )
-        snowflake.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        snowflake.BackgroundTransparency = math.random(5, 8) / 10  -- Прозрачные снежинки
-        snowflake.BorderSizePixel = 0
-        snowflake.ZIndex = 1
-        snowflake.Parent = snowContainer
-        
-        -- Делаем круглую снежинку
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(1, 0)
-        corner.Parent = snowflake
-        
-        return snowflake
-    end
-
-    -- Анимация появления
-    local tweenService = game:GetService("TweenService")
-    
-    local function showAnimation()
-        -- Запускаем снегопад внутри контейнера
-        task.spawn(function()
-            while snowContainer and snowContainer.Parent do
-                -- Создаем несколько снежинок за раз
-                for i = 1, math.random(1, 3) do
-                    local snowflake = createSnowflake()
-                    
-                    if snowflake then
-                        -- Анимация падения снежинки (медленное падение)
-                        local fallTime = math.random(4, 7)
-                        local tween = tweenService:Create(snowflake, TweenInfo.new(
-                            fallTime,
-                            Enum.EasingStyle.Linear
-                        ), {
-                            Position = UDim2.new(
-                                snowflake.Position.X.Scale,
-                                snowflake.Position.X.Offset + math.random(-30, 30),
-                                1.2,  -- Ниже контейнера
-                                math.random(0, 20)
-                            ),
-                            BackgroundTransparency = 1,
-                            Rotation = math.random(-90, 90)
-                        })
-                        
-                        tween:Play()
-                        game:GetService("Debris"):AddItem(snowflake, fallTime + 0.3)
-                    end
-                end
-                task.wait(math.random(3, 7) / 10)  -- Интервал между созданием снежинок
-            end
-        end)
-        
-        -- Ждем немного
-        task.wait(0.3)
         
         -- Появление текста NEXUS
         local nexusAppear = tweenService:Create(nexusText, TweenInfo.new(
