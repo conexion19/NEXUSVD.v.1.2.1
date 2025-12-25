@@ -7,16 +7,11 @@ local Killer = {
     HitboxCache = {}
 }
 
--- ========== SPEAR AIMBOT ==========
+-- ========== SPEAR CROSSHAIR ==========
 
-local SpearAimbot = (function()
+local SpearCrosshair = (function()
     local enabled = false
     local crosshairX, crosshairY
-    local gravity = 98.1
-    local spearSpeed = "Normal" -- Normal или Fast
-    local maxDistance = 50
-    local lastThrowTime = 0
-    local throwCooldown = 1
     
     -- Создание прицела
     local function createCrosshair()
@@ -66,164 +61,21 @@ local SpearAimbot = (function()
         end
     end
     
-    -- Поиск цели для копья
-    local function findBestSpearTarget()
-        local localPlayer = Nexus.Player
-        local localCharacter = localPlayer.Character
-        if not localCharacter then return nil, nil end
-        
-        local localRoot = localCharacter:FindFirstChild("HumanoidRootPart")
-        if not localRoot then return nil, nil end
-        
-        local bestTarget = nil
-        local bestPart = nil
-        local bestDistance = math.huge
-        
-        for _, player in ipairs(Nexus.Services.Players:GetPlayers()) do
-            if player ~= localPlayer then
-                local character = player.Character
-                if character then
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    if humanoid and humanoid.Health > 0 then
-                        local rootPart = character:FindFirstChild("HumanoidRootPart")
-                        if rootPart then
-                            local distance = (localRoot.Position - rootPart.Position).Magnitude
-                            
-                            -- Проверяем видимость и дистанцию
-                            if distance <= maxDistance and isSpearVisible(rootPart) then
-                                -- Предпочтение ближайшей цели
-                                if distance < bestDistance then
-                                    bestDistance = distance
-                                    bestTarget = player
-                                    bestPart = rootPart
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        
-        return bestTarget, bestPart
-    end
-    
-    -- Проверка видимости для копья
-    local function isSpearVisible(part)
-        local origin = Nexus.Services.Workspace.CurrentCamera.CFrame.Position
-        local direction = (part.Position - origin).Unit
-        local ray = Ray.new(origin, direction * 100)
-        
-        local hit, position = Nexus.Services.Workspace:FindPartOnRayWithIgnoreList(ray, {
-            Nexus.Player.Character
-        })
-        
-        if hit and (hit:IsDescendantOf(part.Parent) or spearSpeed == "Fast") then
-            -- Fast spear может проходить сквозь стены
-            return true
-        end
-        
-        return false
-    end
-    
-    -- Расчет траектории
-    local function calculateTrajectory(startPos, targetPos)
-        -- Разница в высоте
-        local deltaY = targetPos.Y - startPos.Y
-        local deltaXZ = (Vector3.new(targetPos.X, 0, targetPos.Z) - Vector3.new(startPos.X, 0, startPos.Z)).Magnitude
-        
-        -- Настройки скорости копья
-        local speed = 100 -- Базовая скорость
-        if spearSpeed == "Fast" then
-            speed = 200 -- Ускоренное копье
-        end
-        
-        -- Расчет угла броска с учетом гравитации
-        local g = gravity
-        local discriminant = speed^4 - g*(g*deltaXZ^2 + 2*deltaY*speed^2)
-        
-        if discriminant < 0 then
-            return nil -- Невозможно попасть
-        end
-        
-        local sqrtDiscriminant = math.sqrt(discriminant)
-        local angle1 = math.atan((speed^2 + sqrtDiscriminant) / (g * deltaXZ))
-        local angle2 = math.atan((speed^2 - sqrtDiscriminant) / (g * deltaXZ))
-        
-        -- Выбираем меньший угол (более плоская траектория)
-        local angle = math.min(angle1, angle2)
-        
-        -- Вектор направления
-        local direction = (targetPos - startPos).Unit
-        direction = Vector3.new(direction.X, math.tan(angle), direction.Z).Unit
-        
-        -- Конечная позиция с учетом траектории
-        local time = deltaXZ / (speed * math.cos(angle))
-        local predictedPos = startPos + (direction * speed * time)
-        
-        return predictedPos
-    end
-    
-    -- Автонаведение при броске
-    local function autoAimOnThrow()
-        local character = Nexus.Player.Character
-        if not character then return false, nil end
-        
-        -- Проверяем, что игрок в режиме копья
-        local spearMode = character:GetAttribute("spearmode")
-        if not spearMode or spearMode ~= "spearing" then return false, nil end
-        
-        local localRoot = character:FindFirstChild("HumanoidRootPart")
-        if not localRoot then return false, nil end
-        
-        -- Ищем лучшую цель
-        local targetPlayer, targetPart = findBestSpearTarget()
-        
-        if targetPlayer and targetPart then
-            -- Вычисляем траекторию броска
-            local targetPos = calculateTrajectory(localRoot.Position, targetPart.Position)
-            
-            if targetPos then
-                -- Наводим камеру на цель
-                local camera = Nexus.Services.Workspace.CurrentCamera
-                local currentCF = camera.CFrame
-                local targetCF = CFrame.new(camera.CFrame.Position, targetPos)
-                
-                -- Плавное наведение
-                for i = 0, 1, 0.1 do
-                    if not enabled then break end
-                    camera.CFrame = currentCF:Lerp(targetCF, i)
-                    Nexus.Services.RunService.RenderStepped:Wait()
-                end
-                
-                return true, targetPlayer
-            end
-        end
-        
-        return false, nil
-    end
-    
-    -- Обновление прицела
+    -- Обновление видимости прицела
     local function updateCrosshair()
         if not crosshairX or not crosshairY then
             createCrosshair()
         end
         
         local character = Nexus.Player.Character
-        local shouldShow = enabled and character and character:GetAttribute("spearmode")
+        local shouldShow = enabled and character and character:GetAttribute("spearmode") == "spearing"
         
         crosshairX.Visible = shouldShow
         crosshairY.Visible = shouldShow
         
         if shouldShow then
-            local targetPlayer, targetPart = findBestSpearTarget()
-            
-            if targetPlayer then
-                crosshairX.Color = Color3.fromRGB(0, 255, 0) -- Зеленый при цели
-                crosshairY.Color = Color3.fromRGB(0, 255, 0)
-            else
-                crosshairX.Color = Color3.fromRGB(255, 0, 0) -- Красный без цели
-                crosshairY.Color = Color3.fromRGB(255, 0, 0)
-            end
+            crosshairX.Color = Color3.fromRGB(255, 0, 0) -
+            crosshairY.Color = Color3.fromRGB(255, 0, 0)
         end
     end
     
@@ -231,169 +83,34 @@ local SpearAimbot = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Nexus.States.SpearAimbotEnabled = true
+        Nexus.States.SpearCrosshairEnabled = true
         
         -- Создаем прицел
         createCrosshair()
         
         -- Запускаем обновление прицела
-        Killer.Connections.SpearAimbotCrosshair = Nexus.Services.RunService.RenderStepped:Connect(updateCrosshair)
+        Killer.Connections.SpearCrosshair = Nexus.Services.RunService.RenderStepped:Connect(updateCrosshair)
         
-        -- Обработка броска копья
-        Killer.Connections.SpearAimbotThrow = Nexus.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            
-            -- Проверяем бросок копья (E или ЛКМ)
-            if (input.KeyCode == Enum.KeyCode.E or input.UserInputType == Enum.UserInputType.MouseButton1) 
-               and enabled then
-                
-                local character = Nexus.Player.Character
-                if not character then return end
-                
-                local spearMode = character:GetAttribute("spearmode")
-                if not spearMode or spearMode ~= "spearing" then return end
-                
-                -- Проверяем кулдаун
-                local currentTime = tick()
-                if currentTime - lastThrowTime < throwCooldown then return end
-                lastThrowTime = currentTime
-                
-                -- Запускаем автонаведение
-                task.spawn(function()
-                    local success, target = autoAimOnThrow()
-                    if success and target then
-                        print("[Spear Aimbot] Автонаведение на игрока:", target.Name)
-                    end
-                end)
-            end
-        end)
-        
-        print("Spear Aimbot: ON")
+        print("Spear Crosshair: ON")
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        Nexus.States.SpearAimbotEnabled = false
+        Nexus.States.SpearCrosshairEnabled = false
         
         -- Удаляем прицел
         destroyCrosshair()
         
         -- Отключаем соединения
-        if Killer.Connections.SpearAimbotCrosshair then
-            Killer.Connections.SpearAimbotCrosshair:Disconnect()
-            Killer.Connections.SpearAimbotCrosshair = nil
+        if Killer.Connections.SpearCrosshair then
+            Killer.Connections.SpearCrosshair:Disconnect()
+            Killer.Connections.SpearCrosshair = nil
         end
         
-        if Killer.Connections.SpearAimbotThrow then
-            Killer.Connections.SpearAimbotThrow:Disconnect()
-            Killer.Connections.SpearAimbotThrow = nil
-        end
-        
-        print("Spear Aimbot: OFF")
+        print("Spear Crosshair: OFF")
     end
     
-    -- Настройки
-    local function SetGravity(value)
-        gravity = value
-        print("Spear Aimbot: Гравитация установлена на", value)
-    end
-    
-    local function SetSpeed(value)
-        spearSpeed = value
-        print("Spear Aimbot: Скорость установлена на", value)
-    end
-    
-    local function SetMaxDistance(value)
-        maxDistance = value
-        print("Spear Aimbot: Максимальная дистанция установлена на", value)
-    end
-    
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end,
-        SetGravity = SetGravity,
-        SetSpeed = SetSpeed,
-        SetMaxDistance = SetMaxDistance,
-        GetSettings = function()
-            return {
-                Gravity = gravity,
-                Speed = spearSpeed,
-                MaxDistance = maxDistance
-            }
-        end
-    }
-end)()
-
--- ========== ONE HIT KILL ==========
-
-local OneHitKill = (function()
-    local enabled = false
-    local basicAttackRemote = nil
-    local lastAttackTime = 0
-    local attackCooldown = 0.5
-
-    local function GetBasicAttackRemote()
-        if not basicAttackRemote then
-            pcall(function()
-                basicAttackRemote = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Attacks"):WaitForChild("BasicAttack")
-            end)
-        end
-        return basicAttackRemote
-    end
-
-    local function SetupAttackHook()
-        local remote = GetBasicAttackRemote()
-        if not remote then return end
-        
-        -- Сохраняем оригинальный метод
-        local originalFireServer = remote.FireServer
-        
-        -- Заменяем метод
-        remote.FireServer = function(self, ...)
-            local result = originalFireServer(self, ...)
-            
-            -- Если OneHitKill включен и не в кулдауне
-            if enabled and tick() - lastAttackTime > attackCooldown then
-                lastAttackTime = tick()
-                
-                -- Вызываем дополнительную атаку
-                task.wait(0.01)
-                originalFireServer(self, ...)
-            end
-            
-            return result
-        end
-    end
-
-    local function GetRole()
-        if not Nexus.Player.Team then return "Survivor" end
-        local teamName = Nexus.Player.Team.Name:lower()
-        return teamName:find("killer") and "Killer" or "Survivor"
-    end
-
-    local function Enable()
-        if enabled then return end
-        enabled = true
-        Nexus.States.OneHitKillEnabled = true
-        
-        SetupAttackHook()
-    end
-
-    local function Disable()
-        if not enabled then return end
-        enabled = false
-        Nexus.States.OneHitKillEnabled = false
-        
-        -- Восстанавливаем оригинальный метод
-        local remote = GetBasicAttackRemote()
-        if remote then
-            -- Переподключаем Remote чтобы восстановить оригинальный метод
-            -- (Игра обычно сама восстанавливает Remote)
-        end
-    end
-
     return {
         Enable = Enable,
         Disable = Disable,
@@ -645,7 +362,7 @@ end)()
 -- ========== BREAK GENERATOR ==========
 
 local spamInProgress = false
-local maxSpamCount = 1000
+local maxSpamCount = 20
 
 local function getGeneratorProgress(gen)
     local progress = 0
@@ -1245,7 +962,7 @@ local AntiBlind = (function()
                         return nil
                     end
                 end
-                
+            
                 return originalNamecall(self, ...)
             end)
             
@@ -1340,84 +1057,22 @@ function Killer.Init(nxs)
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
     
-    -- ========== SPEAR AIMBOT ==========
-    local SpearAimbotToggle = Tabs.Killer:AddToggle("SpearAimbot", {
-        Title = "Spear Aimbot (Veil)", 
-        Description = "Автонаведение для копья Veil", 
+    -- ========== SPEAR CROSSHAIR ==========
+    local SpearCrosshairToggle = Tabs.Killer:AddToggle("SpearCrosshair", {
+        Title = "Spear Crosshair (Veil)", 
+        Description = "Shows the scope in Veil spear mode", 
         Default = false
     })
 
-    SpearAimbotToggle:OnChanged(function(v)
+    SpearCrosshairToggle:OnChanged(function(v)
         Nexus.SafeCallback(function()
             if v then 
-                SpearAimbot.Enable() 
+                SpearCrosshair.Enable() 
             else 
-                SpearAimbot.Disable() 
+                SpearCrosshair.Disable() 
             end
         end)
     end)
-
-    -- Настройки Spear Aimbot
-    local SpearGravitySlider = Tabs.Killer:AddSlider("SpearGravity", {
-        Title = "Гравитация копья",
-        Description = "Настройка гравитации для траектории",
-        Default = 98,
-        Min = 50,
-        Max = 200,
-        Rounding = 1,
-        Callback = function(value)
-            Nexus.SafeCallback(function()
-                SpearAimbot.SetGravity(value)
-            end)
-        end
-    })
-
-    local SpearSpeedDropdown = Tabs.Killer:AddDropdown("SpearSpeed", {
-        Title = "Скорость копья",
-        Description = "Настройка скорости копья",
-        Values = {"Normal", "Fast"},
-        Multi = false,
-        Default = "Normal"
-    })
-
-    SpearSpeedDropdown:OnChanged(function(value)
-        Nexus.SafeCallback(function()
-            SpearAimbot.SetSpeed(value)
-        end)
-    end)
-
-    local SpearDistanceSlider = Tabs.Killer:AddSlider("SpearDistance", {
-        Title = "Макс. дистанция",
-        Description = "Максимальная дистанция прицеливания",
-        Default = 50,
-        Min = 20,
-        Max = 100,
-        Rounding = 1,
-        Callback = function(value)
-            Nexus.SafeCallback(function()
-                SpearAimbot.SetMaxDistance(value)
-            end)
-        end
-    })
-
-    -- ========== ONE HIT KILL ==========
-    if Nexus.IS_DESKTOP then
-        local OneHitKillToggle = Tabs.Killer:AddToggle("OneHitKill", {
-            Title = "OneHitKill", 
-            Description = "Attack nearby players with one click (Killer only)", 
-            Default = false
-        })
-
-        OneHitKillToggle:OnChanged(function(v)
-            Nexus.SafeCallback(function()
-                if v then 
-                    OneHitKill.Enable() 
-                else 
-                    OneHitKill.Disable() 
-                end
-            end)
-        end)
-    end
 
     -- ========== DESTROY PALLETS ==========
     local DestroyPalletsToggle = Tabs.Killer:AddToggle("DestroyPallets", {
@@ -1582,11 +1237,6 @@ function Killer.Init(nxs)
         Content = "Alex - Chainsaw\nTony - Fists\nBrandon - Speed\nJake - Long lunge\nRichter - Stealth\nGraham - Faster vaults\nRichard - Default mask"
     })
 
-    Tabs.Killer:AddParagraph({
-        Title = "Spear Aimbot Information",
-        Content = "Автонаведение для копья Veil\n1. Включите Spear Aimbot\n2. Возьмите копье (режим spearing)\n3. При броске (E или ЛКМ) автоматически наведется на ближайшего игрока"
-    })
-
     -- ========== HANDLE DESTRUCTION FUNCTIONS ==========
     local function handleDestructionFunctions()
         while true do
@@ -1614,8 +1264,7 @@ end
 
 function Killer.Cleanup()
     -- Отключаем все функции
-    SpearAimbot.Disable()
-    OneHitKill.Disable()
+    SpearCrosshair.Disable()
     NoSlowdown.Disable()
     Hitbox.Disable()
     ThirdPerson.Disable()
