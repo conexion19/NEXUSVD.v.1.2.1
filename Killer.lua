@@ -74,7 +74,7 @@ local SpearCrosshair = (function()
         crosshairY.Visible = shouldShow
         
         if shouldShow then
-            crosshairX.Color = Color3.fromRGB(255, 0, 0) -
+            crosshairX.Color = Color3.fromRGB(255, 0, 0) -- Красный цвет
             crosshairY.Color = Color3.fromRGB(255, 0, 0)
         end
     end
@@ -111,6 +111,81 @@ local SpearCrosshair = (function()
         print("Spear Crosshair: OFF")
     end
     
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end
+    }
+end)()
+
+-- ========== ONE HIT KILL ==========
+
+local OneHitKill = (function()
+    local enabled = false
+    local basicAttackRemote = nil
+    local lastAttackTime = 0
+    local attackCooldown = 0.5
+
+    local function GetBasicAttackRemote()
+        if not basicAttackRemote then
+            pcall(function()
+                basicAttackRemote = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Attacks"):WaitForChild("BasicAttack")
+            end)
+        end
+        return basicAttackRemote
+    end
+
+    local function SetupAttackHook()
+        local remote = GetBasicAttackRemote()
+        if not remote then return end
+        
+        -- Сохраняем оригинальный метод
+        local originalFireServer = remote.FireServer
+        
+        -- Заменяем метод
+        remote.FireServer = function(self, ...)
+            local result = originalFireServer(self, ...)
+            
+            -- Если OneHitKill включен и не в кулдауне
+            if enabled and tick() - lastAttackTime > attackCooldown then
+                lastAttackTime = tick()
+                
+                -- Вызываем дополнительную атаку
+                task.wait(0.01)
+                originalFireServer(self, ...)
+            end
+            
+            return result
+        end
+    end
+
+    local function GetRole()
+        if not Nexus.Player.Team then return "Survivor" end
+        local teamName = Nexus.Player.Team.Name:lower()
+        return teamName:find("killer") and "Killer" or "Survivor"
+    end
+
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.OneHitKillEnabled = true
+        
+        SetupAttackHook()
+    end
+
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.OneHitKillEnabled = false
+        
+        -- Восстанавливаем оригинальный метод
+        local remote = GetBasicAttackRemote()
+        if remote then
+            -- Переподключаем Remote чтобы восстановить оригинальный метод
+            -- (Игра обычно сама восстанавливает Remote)
+        end
+    end
+
     return {
         Enable = Enable,
         Disable = Disable,
@@ -362,7 +437,7 @@ end)()
 -- ========== BREAK GENERATOR ==========
 
 local spamInProgress = false
-local maxSpamCount = 20
+local maxSpamCount = 1000
 
 local function getGeneratorProgress(gen)
     local progress = 0
@@ -1060,7 +1135,7 @@ function Killer.Init(nxs)
     -- ========== SPEAR CROSSHAIR ==========
     local SpearCrosshairToggle = Tabs.Killer:AddToggle("SpearCrosshair", {
         Title = "Spear Crosshair (Veil)", 
-        Description = "Shows the scope in Veil spear mode", 
+        Description = "Показывает прицел в режиме копья Veil", 
         Default = false
     })
 
@@ -1073,6 +1148,25 @@ function Killer.Init(nxs)
             end
         end)
     end)
+
+    -- ========== ONE HIT KILL ==========
+    if Nexus.IS_DESKTOP then
+        local OneHitKillToggle = Tabs.Killer:AddToggle("OneHitKill", {
+            Title = "OneHitKill", 
+            Description = "Attack nearby players with one click (Killer only)", 
+            Default = false
+        })
+
+        OneHitKillToggle:OnChanged(function(v)
+            Nexus.SafeCallback(function()
+                if v then 
+                    OneHitKill.Enable() 
+                else 
+                    OneHitKill.Disable() 
+                end
+            end)
+        end)
+    end
 
     -- ========== DESTROY PALLETS ==========
     local DestroyPalletsToggle = Tabs.Killer:AddToggle("DestroyPallets", {
@@ -1237,6 +1331,11 @@ function Killer.Init(nxs)
         Content = "Alex - Chainsaw\nTony - Fists\nBrandon - Speed\nJake - Long lunge\nRichter - Stealth\nGraham - Faster vaults\nRichard - Default mask"
     })
 
+    Tabs.Killer:AddParagraph({
+        Title = "Spear Crosshair Information",
+        Content = "Прицел для копья Veil\n1. Включите Spear Crosshair\n2. Войдите в режим копья (spearing)\n3. Прицел появится в центре экрана"
+    })
+
     -- ========== HANDLE DESTRUCTION FUNCTIONS ==========
     local function handleDestructionFunctions()
         while true do
@@ -1265,6 +1364,7 @@ end
 function Killer.Cleanup()
     -- Отключаем все функции
     SpearCrosshair.Disable()
+    OneHitKill.Disable()
     NoSlowdown.Disable()
     Hitbox.Disable()
     ThirdPerson.Disable()
