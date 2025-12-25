@@ -61,58 +61,17 @@ do
         -- Ждем 1.5 секунды
         task.wait(1.5)
         
-        -- Эффект разрушения букв (анимация падения букв)
-        for i = 1, #nexusText.Text do
-            local charFrame = Instance.new("Frame")
-            charFrame.Size = UDim2.new(0, 15, 0, 30)
-            charFrame.Position = UDim2.new(0.5 - (#nexusText.Text * 7.5) / 200 + (i-1) * 15/200, 0, 0.5, 0)
-            charFrame.BackgroundTransparency = 1
-            charFrame.Parent = mainContainer
-            
-            local charLabel = Instance.new("TextLabel")
-            charLabel.Size = UDim2.new(1, 0, 1, 0)
-            charLabel.BackgroundTransparency = 1
-            charLabel.Text = string.sub(nexusText.Text, i, i)
-            charLabel.Font = Enum.Font.GothamBlack
-            charLabel.TextSize = 25
-            charLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            charLabel.Parent = charFrame
-            
-            -- Анимация падения буквы
-            local fallTween = TweenService:Create(charFrame, TweenInfo.new(
-                0.5,
-                Enum.EasingStyle.Quad,
-                Enum.EasingDirection.In
-            ), {
-                Position = UDim2.new(
-                    charFrame.Position.X.Scale,
-                    charFrame.Position.X.Offset,
-                    charFrame.Position.Y.Scale + 0.5,
-                    charFrame.Position.Y.Offset
-                ),
-                Rotation = math.random(-45, 45)
-            })
-            
-            local fadeTween = TweenService:Create(charLabel, TweenInfo.new(
-                0.5,
-                Enum.EasingStyle.Quad,
-                Enum.EasingDirection.In
-            ), {
-                TextTransparency = 1
-            })
-            
-            -- Запускаем с задержкой для эффекта каскада
-            task.delay((i-1) * 0.05, function()
-                fallTween:Play()
-                fadeTween:Play()
-                
-                task.wait(0.5)
-                charFrame:Destroy()
-            end)
-        end
+        -- Растворение NEXUS SCRIPT
+        local nexusDisappear = TweenService:Create(nexusText, TweenInfo.new(
+            0.5,
+            Enum.EasingStyle.Quad,
+            Enum.EasingDirection.In
+        ), {
+            TextTransparency = 1
+        })
         
-        -- Ждем завершения анимации падения
-        task.wait(0.5)
+        nexusDisappear:Play()
+        nexusDisappear.Completed:Wait()
         
         -- Появление Violence District на том же месте
         local violenceAppear = TweenService:Create(violenceText, TweenInfo.new(
@@ -151,6 +110,7 @@ do
     -- Ждем завершения анимации перед загрузкой библиотек
     task.wait(4)
 end
+
 -- ========== ЗАГРУЗКА БИБЛИОТЕК ==========
 local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/zawerex/govno435345/refs/heads/main/g"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
