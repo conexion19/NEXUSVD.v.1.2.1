@@ -7,10 +7,10 @@ local Binds = {
         enabled = false,
         connection = nil
     },
-    KeyDisplay = {
+    Display = {
         gui = nil,
-        container = nil,
-        activeBinds = {}, -- Хранит активные бинды: {["AutoParry"] = "F1", ["WalkSpeed"] = "F2", ...}
+        textLabel = nil,
+        activeBinds = {} -- {["AutoParry"] = "F1", ["WalkSpeed"] = "F2"}
     }
 }
 
@@ -22,8 +22,8 @@ function Binds.Init(nxs)
     local Tabs = Nexus.Tabs
     if not Tabs.Binds then return end
     
-    -- ========== CREATE KEY DISPLAY GUI ==========
-    Binds.CreateKeyDisplay()
+    -- ========== СОЗДАЕМ ОТОБРАЖЕНИЕ СВЕРХУ ==========
+    Binds.CreateTopDisplay()
     
     -- ========== CURSOR UNLOCK ==========
     Tabs.Binds:AddSection("Cursor Unlock")
@@ -44,9 +44,9 @@ function Binds.Init(nxs)
                     Content = "Cursor toggle key set to: " .. tostring(newKey),
                     Duration = 2
                 })
-                -- Добавляем/обновляем бинд на экране
-                Binds.UpdateKeyDisplay("Cursor Toggle", newKey)
-                print("[BINDS] Cursor Toggle назначен на клавишу: " .. tostring(newKey))
+                -- Выводим в консоль и обновляем отображение
+                print("[BINDS] Cursor Toggle назначен на: " .. tostring(newKey))
+                Binds.UpdateDisplay("Cursor Toggle", newKey)
             end)
         end
     })
@@ -67,9 +67,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("AutoParry", newKey)
-            -- Добавляем/обновляем бинд на экране
-            Binds.UpdateKeyDisplay("AutoParry", newKey)
-            print("[BINDS] AutoParry назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] AutoParry назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("AutoParry", newKey)
         end
     })
     
@@ -84,8 +83,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("AutoParryV2", newKey)
-            Binds.UpdateKeyDisplay("AutoParryV2", newKey)
-            print("[BINDS] AutoParryV2 назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] AutoParryV2 назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("AutoParryV2", newKey)
         end
     })
     
@@ -100,8 +99,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("Heal", newKey)
-            Binds.UpdateKeyDisplay("Heal", newKey)
-            print("[BINDS] Heal назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] Heal назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("Heal", newKey)
         end
     })
     
@@ -116,8 +115,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("InstantHeal", newKey)
-            Binds.UpdateKeyDisplay("InstantHeal", newKey)
-            print("[BINDS] InstantHeal назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] InstantHeal назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("InstantHeal", newKey)
         end
     })
     
@@ -132,8 +131,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("SilentHeal", newKey)
-            Binds.UpdateKeyDisplay("SilentHeal", newKey)
-            print("[BINDS] SilentHeal назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] SilentHeal назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("SilentHeal", newKey)
         end
     })
     
@@ -148,8 +147,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("GateTool", newKey)
-            Binds.UpdateKeyDisplay("GateTool", newKey)
-            print("[BINDS] GateTool назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] GateTool назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("GateTool", newKey)
         end
     })
     
@@ -164,8 +163,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("NoHitbox", newKey)
-            Binds.UpdateKeyDisplay("NoHitbox", newKey)
-            print("[BINDS] NoHitbox назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] NoHitbox назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("NoHitbox", newKey)
         end
     })
     
@@ -180,8 +179,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("AutoPerfectSkill", newKey)
-            Binds.UpdateKeyDisplay("AutoPerfectSkill", newKey)
-            print("[BINDS] AutoPerfectSkill назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] AutoPerfectSkill назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("AutoPerfectSkill", newKey)
         end
     })
     
@@ -199,8 +198,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("OneHitKill", newKey)
-            Binds.UpdateKeyDisplay("OneHitKill", newKey)
-            print("[BINDS] OneHitKill назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] OneHitKill назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("OneHitKill", newKey)
         end
     })
     
@@ -215,8 +214,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("AntiBlind", newKey)
-            Binds.UpdateKeyDisplay("AntiBlind", newKey)
-            print("[BINDS] AntiBlind назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] AntiBlind назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("AntiBlind", newKey)
         end
     })
     
@@ -231,8 +230,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("NoSlowdown", newKey)
-            Binds.UpdateKeyDisplay("NoSlowdown", newKey)
-            print("[BINDS] NoSlowdown назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] NoSlowdown назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("NoSlowdown", newKey)
         end
     })
     
@@ -247,8 +246,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("DestroyPallets", newKey)
-            Binds.UpdateKeyDisplay("DestroyPallets", newKey)
-            print("[BINDS] DestroyPallets назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] DestroyPallets назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("DestroyPallets", newKey)
         end
     })
     
@@ -263,8 +262,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("BreakGenerator", newKey)
-            Binds.UpdateKeyDisplay("BreakGenerator", newKey)
-            print("[BINDS] BreakGenerator назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] BreakGenerator назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("BreakGenerator", newKey)
         end
     })
     
@@ -282,8 +281,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("InfiniteLunge", newKey)
-            Binds.UpdateKeyDisplay("InfiniteLunge", newKey)
-            print("[BINDS] InfiniteLunge назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] InfiniteLunge назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("InfiniteLunge", newKey)
         end
     })
     
@@ -298,8 +297,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("WalkSpeed", newKey)
-            Binds.UpdateKeyDisplay("WalkSpeed", newKey)
-            print("[BINDS] WalkSpeed назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] WalkSpeed назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("WalkSpeed", newKey)
         end
     })
     
@@ -314,8 +313,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("Noclip", newKey)
-            Binds.UpdateKeyDisplay("Noclip", newKey)
-            print("[BINDS] Noclip назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] Noclip назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("Noclip", newKey)
         end
     })
     
@@ -330,8 +329,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("FOVChanger", newKey)
-            Binds.UpdateKeyDisplay("FOVChanger", newKey)
-            print("[BINDS] FOVChanger назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] FOVChanger назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("FOVChanger", newKey)
         end
     })
     
@@ -346,8 +345,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("Fly", newKey)
-            Binds.UpdateKeyDisplay("Fly", newKey)
-            print("[BINDS] Fly назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] Fly назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("Fly", newKey)
         end
     })
     
@@ -362,201 +361,108 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("FreeCamera", newKey)
-            Binds.UpdateKeyDisplay("FreeCamera", newKey)
-            print("[BINDS] FreeCamera назначен на клавишу: " .. tostring(newKey))
+            print("[BINDS] FreeCamera назначен на: " .. tostring(newKey))
+            Binds.UpdateDisplay("FreeCamera", newKey)
         end
     })
 end
 
--- ========== KEY DISPLAY FUNCTIONS ==========
+-- ========== DISPLAY FUNCTIONS ==========
 
-function Binds.CreateKeyDisplay()
-    -- Создаем GUI для отображения клавиш
+function Binds.CreateTopDisplay()
+    -- Создаем простой текст сверху экрана
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "KeybindDisplay"
+    screenGui.Name = "BindDisplay"
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.ResetOnSpawn = false
     
-    -- Контейнер для горизонтального расположения биндов
-    local container = Instance.new("Frame")
-    container.Name = "KeybindContainer"
-    container.Size = UDim2.new(1, 0, 0, 40) -- Растягиваем на всю ширину, высота 40px
-    container.Position = UDim2.new(0, 0, 0, 5) -- Вверху экрана
-    container.BackgroundTransparency = 1 -- Полностью прозрачный фон
-    container.Visible = true
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Name = "BindText"
+    textLabel.Size = UDim2.new(1, 0, 0, 30)
+    textLabel.Position = UDim2.new(0, 0, 0, 10)
+    textLabel.BackgroundTransparency = 1 -- Прозрачный фон
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Белый текст
+    textLabel.Text = "Binds: "
+    textLabel.Font = Enum.Font.GothamMedium
+    textLabel.TextSize = 18
+    textLabel.TextWrapped = false
+    textLabel.TextXAlignment = Enum.TextXAlignment.Center
+    textLabel.TextYAlignment = Enum.TextYAlignment.Top
     
-    -- Layout для горизонтального расположения
-    local layout = Instance.new("UIListLayout")
-    layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.VerticalAlignment = Enum.VerticalAlignment.Center
-    layout.Padding = UDim.new(0, 15) -- Расстояние между элементами
-    layout.Parent = container
+    -- Тень для лучшей читаемости
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.2
+    stroke.Parent = textLabel
     
-    container.Parent = screenGui
+    textLabel.Parent = screenGui
     
     -- Сохраняем ссылки
-    Binds.KeyDisplay.gui = screenGui
-    Binds.KeyDisplay.container = container
-    Binds.KeyDisplay.bindFrames = {} -- Хранит созданные фреймы для биндов
+    Binds.Display.gui = screenGui
+    Binds.Display.textLabel = textLabel
     
-    -- Встраиваем GUI в игровое окно
+    -- Встраиваем GUI
     if Nexus and Nexus.Player then
         screenGui.Parent = Nexus.Player:WaitForChild("PlayerGui")
     else
         screenGui.Parent = game:GetService("CoreGui")
     end
     
-    print("[BINDS] Key display created")
+    print("[BINDS] Display created at top of screen")
 end
 
-function Binds.FormatKeyName(key)
-    if not key or key == "" then
-        return "None"
-    end
-    
-    -- Форматируем клавиши для лучшего отображения
-    local keyMap = {
-        ["LeftControl"] = "L-Ctrl",
-        ["RightControl"] = "R-Ctrl",
-        ["LeftShift"] = "L-Shift",
-        ["RightShift"] = "R-Shift",
-        ["LeftAlt"] = "L-Alt",
-        ["RightAlt"] = "R-Alt",
-        ["Return"] = "Enter",
-        ["Escape"] = "Esc",
-        ["Backspace"] = "Back",
-        ["Space"] = "Space",
-        ["Tab"] = "Tab",
-        ["CapsLock"] = "Caps",
-        ["Insert"] = "Ins",
-        ["Delete"] = "Del",
-        ["Home"] = "Home",
-        ["End"] = "End",
-        ["PageUp"] = "PgUp",
-        ["PageDown"] = "PgDn",
-        ["Up"] = "↑",
-        ["Down"] = "↓",
-        ["Left"] = "←",
-        ["Right"] = "→",
-    }
-    
-    return keyMap[key] or key
-end
-
-function Binds.UpdateKeyDisplay(bindName, key)
+function Binds.UpdateDisplay(bindName, key)
     -- Если клавиша пустая, удаляем бинд
     if not key or key == "" then
-        Binds.RemoveBindDisplay(bindName)
-        return
+        Binds.Display.activeBinds[bindName] = nil
+    else
+        -- Сохраняем бинд
+        Binds.Display.activeBinds[bindName] = key
     end
     
-    -- Обновляем список активных биндов
-    Binds.KeyDisplay.activeBinds[bindName] = key
-    
-    -- Обновляем отображение
-    Binds.RefreshDisplay()
-    
-    print("[BINDS] Updated display: " .. bindName .. " = " .. key)
+    -- Обновляем текст на экране
+    Binds.RefreshDisplayText()
 end
 
-function Binds.RemoveBindDisplay(bindName)
-    -- Удаляем из списка активных биндов
-    Binds.KeyDisplay.activeBinds[bindName] = nil
+function Binds.RefreshDisplayText()
+    local textLabel = Binds.Display.textLabel
+    if not textLabel then return end
     
-    -- Обновляем отображение
-    Binds.RefreshDisplay()
-    
-    print("[BINDS] Removed from display: " .. bindName)
-end
-
-function Binds.RefreshDisplay()
-    -- Удаляем старые фреймы
-    if Binds.KeyDisplay.bindFrames then
-        for _, frame in pairs(Binds.KeyDisplay.bindFrames) do
-            frame:Destroy()
-        end
-        Binds.KeyDisplay.bindFrames = {}
-    end
-    
-    -- Создаем новые фреймы для каждого активного бинда
-    local container = Binds.KeyDisplay.container
-    if not container then return end
+    -- Собираем все активные бинды
+    local displayText = "Binds: "
+    local bindCount = 0
     
     local sortedBinds = {}
-    for bindName, key in pairs(Binds.KeyDisplay.activeBinds) do
-        table.insert(sortedBinds, {name = bindName, key = key})
+    for name, key in pairs(Binds.Display.activeBinds) do
+        if key and key ~= "" then
+            table.insert(sortedBinds, {name = name, key = key})
+        end
     end
     
-    -- Сортируем по алфавиту для красивого отображения
+    -- Сортируем по алфавиту
     table.sort(sortedBinds, function(a, b)
         return a.name < b.name
     end)
     
-    for _, bind in ipairs(sortedBinds) do
-        if bind.key and bind.key ~= "" then
-            -- Создаем фрейм для одного бинда
-            local frame = Instance.new("Frame")
-            frame.Name = "BindFrame_" .. bind.name
-            frame.Size = UDim2.new(0, 0, 0, 30) -- Автоматическая ширина
-            frame.BackgroundTransparency = 1 -- Прозрачный фон
-            frame.BorderSizePixel = 0
-            
-            -- Текст бинда
-            local textLabel = Instance.new("TextLabel")
-            textLabel.Name = "BindText"
-            textLabel.Size = UDim2.new(1, 0, 1, 0)
-            textLabel.Position = UDim2.new(0, 0, 0, 0)
-            textLabel.BackgroundTransparency = 1
-            textLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Белый цвет
-            textLabel.Text = bind.name .. ": [" .. Binds.FormatKeyName(bind.key) .. "]"
-            textLabel.Font = Enum.Font.GothamMedium
-            textLabel.TextSize = 16
-            textLabel.TextWrapped = false
-            textLabel.TextXAlignment = Enum.TextXAlignment.Center
-            textLabel.TextYAlignment = Enum.TextYAlignment.Center
-            
-            -- Тень текста для лучшей читаемости
-            local textShadow = Instance.new("UIStroke")
-            textShadow.Color = Color3.fromRGB(0, 0, 0)
-            textShadow.Thickness = 1.5
-            textShadow.Transparency = 0.2
-            textShadow.Parent = textLabel
-            
-            textLabel.Parent = frame
-            frame.Parent = container
-            
-            -- Сохраняем ссылку
-            table.insert(Binds.KeyDisplay.bindFrames, frame)
-            
-            -- Автоматически подстраиваем ширину под текст
-            local textSize = game:GetService("TextService"):GetTextSize(
-                textLabel.Text,
-                textLabel.TextSize,
-                textLabel.Font,
-                Vector2.new(1000, 30)
-            )
-            frame.Size = UDim2.new(0, textSize.X + 20, 0, 30)
+    -- Формируем текст
+    for i, bind in ipairs(sortedBinds) do
+        if i > 1 then
+            displayText = displayText .. " | "
         end
+        displayText = displayText .. bind.name .. ": " .. bind.key
+        bindCount = bindCount + 1
     end
     
-    -- Показываем или скрываем контейнер в зависимости от наличия биндов
-    if #sortedBinds > 0 then
-        container.Visible = true
+    -- Если нет биндов, скрываем текст
+    if bindCount == 0 then
+        textLabel.Text = ""
     else
-        container.Visible = false
+        textLabel.Text = displayText
     end
-end
-
-function Binds.ShowAllBinds()
-    -- Показывает все назначенные бинды в консоли
-    print("=== НАЗНАЧЕННЫЕ БИНДЫ ===")
-    for bindName, key in pairs(Binds.KeyDisplay.activeBinds) do
-        if key and key ~= "" then
-            print(bindName .. ": [" .. Binds.FormatKeyName(key) .. "]")
-        end
-    end
-    print("=========================")
+    
+    -- Выводим в консоль текущие бинды
+    print("[BINDS] Current binds: " .. displayText)
 end
 
 -- ========== CURSOR UNLOCK FUNCTIONS ==========
@@ -662,14 +568,13 @@ function Binds.Cleanup()
     Binds.ResetCursorState()
     
     -- Удаляем GUI
-    if Binds.KeyDisplay.gui then
-        Binds.KeyDisplay.gui:Destroy()
-        Binds.KeyDisplay.gui = nil
+    if Binds.Display.gui then
+        Binds.Display.gui:Destroy()
+        Binds.Display.gui = nil
     end
     
     -- Очищаем данные
-    Binds.KeyDisplay.activeBinds = {}
-    Binds.KeyDisplay.bindFrames = {}
+    Binds.Display.activeBinds = {}
     
     print("[BINDS] Binds module cleaned up")
 end
