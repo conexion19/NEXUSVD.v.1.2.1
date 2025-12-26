@@ -1636,7 +1636,7 @@ function Survivor.Init(nxs)
     end)
 
     -- ========== SACRIFICE SELF ==========
-    local SacrificeSelfToggle = Tabs.Killer:AddToggle("SacrificeSelf", {
+    local SacrificeSelfToggle = Tabs.Main:AddToggle("SacrificeSelf", {
         Title = "Sacrifice Self (Kill Killer)", 
         Description = "Kills nearest killer and yourself", 
         Default = false
