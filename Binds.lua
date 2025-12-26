@@ -6,6 +6,12 @@ local Binds = {
     CursorUnlock = {
         enabled = false,
         connection = nil
+    },
+    KeyDisplay = {
+        gui = nil,
+        label = nil,
+        timer = nil,
+        connection = nil
     }
 }
 
@@ -16,6 +22,9 @@ function Binds.Init(nxs)
     
     local Tabs = Nexus.Tabs
     if not Tabs.Binds then return end
+    
+    -- ========== CREATE KEY DISPLAY GUI ==========
+    Binds.CreateKeyDisplay()
     
     -- ========== CURSOR UNLOCK ==========
     Tabs.Binds:AddSection("Cursor Unlock")
@@ -36,6 +45,8 @@ function Binds.Init(nxs)
                     Content = "Cursor toggle key set to: " .. tostring(newKey),
                     Duration = 2
                 })
+                -- Показываем клавишу на экране
+                Binds.ShowKeyOnScreen("Cursor Toggle", newKey)
             end)
         end
     })
@@ -56,6 +67,8 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("AutoParry", newKey)
+            -- Показываем клавишу на экране
+            Binds.ShowKeyOnScreen("AutoParry", newKey)
         end
     })
     
@@ -70,6 +83,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("AutoParryV2", newKey)
+            Binds.ShowKeyOnScreen("AutoParryV2", newKey)
         end
     })
     
@@ -84,6 +98,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("Heal", newKey)
+            Binds.ShowKeyOnScreen("Heal", newKey)
         end
     })
     
@@ -98,6 +113,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("InstantHeal", newKey)
+            Binds.ShowKeyOnScreen("InstantHeal", newKey)
         end
     })
     
@@ -112,6 +128,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("SilentHeal", newKey)
+            Binds.ShowKeyOnScreen("SilentHeal", newKey)
         end
     })
     
@@ -126,6 +143,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("GateTool", newKey)
+            Binds.ShowKeyOnScreen("GateTool", newKey)
         end
     })
     
@@ -140,6 +158,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("NoHitbox", newKey)
+            Binds.ShowKeyOnScreen("NoHitbox", newKey)
         end
     })
     
@@ -154,6 +173,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("AutoPerfectSkill", newKey)
+            Binds.ShowKeyOnScreen("AutoPerfectSkill", newKey)
         end
     })
     
@@ -171,6 +191,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("OneHitKill", newKey)
+            Binds.ShowKeyOnScreen("OneHitKill", newKey)
         end
     })
     
@@ -185,6 +206,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("AntiBlind", newKey)
+            Binds.ShowKeyOnScreen("AntiBlind", newKey)
         end
     })
     
@@ -199,6 +221,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("NoSlowdown", newKey)
+            Binds.ShowKeyOnScreen("NoSlowdown", newKey)
         end
     })
     
@@ -213,6 +236,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("DestroyPallets", newKey)
+            Binds.ShowKeyOnScreen("DestroyPallets", newKey)
         end
     })
     
@@ -227,6 +251,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("BreakGenerator", newKey)
+            Binds.ShowKeyOnScreen("BreakGenerator", newKey)
         end
     })
     
@@ -244,6 +269,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("InfiniteLunge", newKey)
+            Binds.ShowKeyOnScreen("InfiniteLunge", newKey)
         end
     })
     
@@ -258,6 +284,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("WalkSpeed", newKey)
+            Binds.ShowKeyOnScreen("WalkSpeed", newKey)
         end
     })
     
@@ -272,6 +299,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("Noclip", newKey)
+            Binds.ShowKeyOnScreen("Noclip", newKey)
         end
     })
     
@@ -286,6 +314,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("FOVChanger", newKey)
+            Binds.ShowKeyOnScreen("FOVChanger", newKey)
         end
     })
     
@@ -300,6 +329,7 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("Fly", newKey)
+            Binds.ShowKeyOnScreen("Fly", newKey)
         end
     })
     
@@ -314,9 +344,175 @@ function Binds.Init(nxs)
         end,
         ChangedCallback = function(newKey)
             Binds.HandleKeybindChange("FreeCamera", newKey)
+            Binds.ShowKeyOnScreen("FreeCamera", newKey)
         end
     })
+end
+
+-- ========== KEY DISPLAY FUNCTIONS ==========
+
+function Binds.CreateKeyDisplay()
+    -- Создаем GUI для отображения клавиши
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "KeybindDisplay"
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.ResetOnSpawn = false
     
+    -- Основной фрейм (квадрат)
+    local frame = Instance.new("Frame")
+    frame.Name = "KeyDisplayFrame"
+    frame.Size = UDim2.new(0, 200, 0, 80)
+    frame.Position = UDim2.new(0.5, -100, 0.2, 0) -- Центрируем по горизонтали, 20% от верха
+    frame.AnchorPoint = Vector2.new(0.5, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 2
+    frame.BorderColor3 = Color3.fromRGB(100, 100, 255)
+    frame.Visible = false
+    
+    -- Скругление углов
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+    
+    -- Внутренняя тень
+    local shadow = Instance.new("UIStroke")
+    shadow.Color = Color3.fromRGB(0, 0, 0)
+    shadow.Thickness = 2
+    shadow.Transparency = 0.5
+    shadow.Parent = frame
+    
+    -- Заголовок (название функции)
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.Position = UDim2.new(0, 0, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+    titleLabel.Text = "Keybind Assigned"
+    titleLabel.Font = Enum.Font.GothamMedium
+    titleLabel.TextSize = 16
+    titleLabel.TextWrapped = true
+    
+    -- Отображение клавиши (большой текст)
+    local keyLabel = Instance.new("TextLabel")
+    keyLabel.Name = "KeyLabel"
+    keyLabel.Size = UDim2.new(1, 0, 0, 50)
+    keyLabel.Position = UDim2.new(0, 0, 0, 30)
+    keyLabel.BackgroundTransparency = 1
+    keyLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    keyLabel.Text = "[KEY]"
+    keyLabel.Font = Enum.Font.GothamBold
+    keyLabel.TextSize = 24
+    keyLabel.TextWrapped = true
+    
+    -- Размещаем элементы
+    titleLabel.Parent = frame
+    keyLabel.Parent = frame
+    frame.Parent = screenGui
+    
+    -- Сохраняем ссылки
+    Binds.KeyDisplay.gui = screenGui
+    Binds.KeyDisplay.label = keyLabel
+    Binds.KeyDisplay.titleLabel = titleLabel
+    Binds.KeyDisplay.frame = frame
+    
+    -- Встраиваем GUI в игровое окно
+    if Nexus and Nexus.Player then
+        screenGui.Parent = Nexus.Player:WaitForChild("PlayerGui")
+    else
+        screenGui.Parent = game:GetService("CoreGui")
+    end
+end
+
+function Binds.ShowKeyOnScreen(functionName, key)
+    if not Binds.KeyDisplay.gui then
+        Binds.CreateKeyDisplay()
+    end
+    
+    if not key or key == "" then
+        return
+    end
+    
+    -- Форматируем клавишу для отображения
+    local displayKey = tostring(key)
+    
+    -- Улучшаем отображение для специальных клавиш
+    local keyMap = {
+        ["LeftControl"] = "L-Ctrl",
+        ["RightControl"] = "R-Ctrl",
+        ["LeftShift"] = "L-Shift",
+        ["RightShift"] = "R-Shift",
+        ["LeftAlt"] = "L-Alt",
+        ["RightAlt"] = "R-Alt",
+        ["Return"] = "Enter",
+        ["Escape"] = "Esc",
+        ["Backspace"] = "Back",
+        ["Space"] = "Space",
+        ["Tab"] = "Tab",
+        ["CapsLock"] = "Caps",
+        ["Insert"] = "Ins",
+        ["Delete"] = "Del",
+        ["Home"] = "Home",
+        ["End"] = "End",
+        ["PageUp"] = "PgUp",
+        ["PageDown"] = "PgDn",
+        ["Up"] = "↑",
+        ["Down"] = "↓",
+        ["Left"] = "←",
+        ["Right"] = "→",
+    }
+    
+    displayKey = keyMap[displayKey] or displayKey
+    
+    -- Обновляем текст
+    Binds.KeyDisplay.titleLabel.Text = functionName
+    Binds.KeyDisplay.label.Text = "[" .. displayKey .. "]"
+    
+    -- Показываем фрейм
+    Binds.KeyDisplay.frame.Visible = true
+    
+    -- Устанавливаем таймер для скрытия
+    if Binds.KeyDisplay.timer then
+        Binds.KeyDisplay.timer:Disconnect()
+    end
+    
+    if Binds.KeyDisplay.connection then
+        Binds.KeyDisplay.connection:Disconnect()
+    end
+    
+    -- Скрываем через 3 секунды
+    Binds.KeyDisplay.timer = task.delay(3, function()
+        Binds.KeyDisplay.frame.Visible = false
+    end)
+    
+    -- Также скрываем при клике
+    Binds.KeyDisplay.connection = Binds.KeyDisplay.frame.MouseButton1Click:Connect(function()
+        Binds.KeyDisplay.frame.Visible = false
+        if Binds.KeyDisplay.timer then
+            Binds.KeyDisplay.timer:Disconnect()
+            Binds.KeyDisplay.timer = nil
+        end
+    end)
+    
+    print("Key display shown: " .. functionName .. " = " .. displayKey)
+end
+
+function Binds.HideKeyDisplay()
+    if Binds.KeyDisplay.frame then
+        Binds.KeyDisplay.frame.Visible = false
+    end
+    
+    if Binds.KeyDisplay.timer then
+        Binds.KeyDisplay.timer:Disconnect()
+        Binds.KeyDisplay.timer = nil
+    end
+    
+    if Binds.KeyDisplay.connection then
+        Binds.KeyDisplay.connection:Disconnect()
+        Binds.KeyDisplay.connection = nil
+    end
+end
 
 -- ========== CURSOR UNLOCK FUNCTIONS ==========
 
@@ -419,6 +615,13 @@ end
 function Binds.Cleanup()
     Binds.DisableCursorUnlock()
     Binds.ResetCursorState()
+    Binds.HideKeyDisplay()
+    
+    -- Удаляем GUI
+    if Binds.KeyDisplay.gui then
+        Binds.KeyDisplay.gui:Destroy()
+        Binds.KeyDisplay.gui = nil
+    end
     
     print("Binds module cleaned up")
 end
