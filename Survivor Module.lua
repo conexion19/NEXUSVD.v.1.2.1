@@ -425,6 +425,61 @@ local NoSlowdown = (function()
     local enabled = false
     local connection = nil
 
+    local function IsCrawling(humanoid)
+        if not humanoid then return false end
+        
+        -- Проверка состояния ползания
+        local state = humanoid:GetState()
+        if state == Enum.HumanoidStateType.FallingDown or 
+           state == Enum.HumanoidStateType.GettingUp or
+           state == Enum.HumanoidStateType.Freefall then
+            return true
+        end
+        
+        -- Проверка по скорости
+        if humanoid.WalkSpeed < 8 then
+            return true
+        end
+        
+        -- Проверка по анимациям
+        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+            if track.Animation then
+                local animName = track.Animation.AnimationId:lower()
+                if animName:find("crawl") or animName:find("downed") or animName:find("injured") then
+                    return true
+                end
+            end
+        end
+        
+        -- Проверка по атрибутам
+        local character = humanoid.Parent
+        if character and (character:GetAttribute("Downed") or character:GetAttribute("Crawling")) then
+            return true
+        end
+        
+        return false
+    end
+
+    local function UpdateWalkSpeed()
+        if not enabled then return end
+        
+        local character = Nexus.getCharacter()
+        if not character then return end
+        
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+        
+        -- Проверяем, не лежит ли персонаж
+        if IsCrawling(humanoid) then
+            return -- Не работаем, если персонаж ползет
+        end
+        
+        if humanoid.WalkSpeed ~= 16 then
+            humanoid:SetAttribute("NoSlowdown", true)
+            humanoid.WalkSpeed = 16
+        end
+    end
+
     local function Enable()
         if enabled then return end
         enabled = true
@@ -435,13 +490,16 @@ local NoSlowdown = (function()
         if character then
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if humanoid then
-                humanoid:SetAttribute("NoSlowdown", true)
-                humanoid.WalkSpeed = 16
+                -- Проверяем состояние перед установкой скорости
+                if not IsCrawling(humanoid) then
+                    humanoid:SetAttribute("NoSlowdown", true)
+                    humanoid.WalkSpeed = 16
+                end
                 
                 -- Отслеживаем изменения скорости и возвращаем к 16
                 connection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-                    if enabled and humanoid and humanoid.WalkSpeed ~= 16 then
-                        humanoid.WalkSpeed = 16
+                    if enabled and humanoid then
+                        UpdateWalkSpeed()
                     end
                 end)
             end
@@ -454,8 +512,11 @@ local NoSlowdown = (function()
             if enabled then
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum then
-                    hum:SetAttribute("NoSlowdown", true)
-                    hum.WalkSpeed = 16
+                    -- Проверяем состояние перед установкой скорости
+                    if not IsCrawling(hum) then
+                        hum:SetAttribute("NoSlowdown", true)
+                        hum.WalkSpeed = 16
+                    end
                     
                     -- Обновляем соединение для нового персонажа
                     if connection then
@@ -463,8 +524,8 @@ local NoSlowdown = (function()
                     end
                     
                     connection = hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-                        if enabled and hum and hum.WalkSpeed ~= 16 then
-                            hum.WalkSpeed = 16
+                        if enabled and hum then
+                            UpdateWalkSpeed()
                         end
                     end)
                 end
@@ -497,7 +558,13 @@ local NoSlowdown = (function()
     return {
         Enable = Enable,
         Disable = Disable,
-        IsEnabled = function() return enabled end
+        IsEnabled = function() return enabled end,
+        IsCrawling = function()
+            local character = Nexus.getCharacter()
+            if not character then return false end
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            return IsCrawling(humanoid)
+        end
     }
 end)()
 
@@ -508,7 +575,6 @@ local AutoParry = (function()
     local RANGE = 10
     local lastCheck = 0
     local CHECK_INTERVAL = 0.1
-    local useRemoteEvent = false -- Флаг для переключения между методами
 
     local AttackAnimations = {
         "rbxassetid://110355011987939",
@@ -561,25 +627,14 @@ local AutoParry = (function()
     end
 
     local function PerformParry()
-        if useRemoteEvent then
-            -- Используем RemoteEvent "parry"
-            pcall(function()
-                if Nexus.Services.ReplicatedStorage.Remotes and 
-                   Nexus.Services.ReplicatedStorage.Remotes.Items and
-                   Nexus.Services.ReplicatedStorage.Remotes.Items["Parrying Dagger"] then
-                    Nexus.Services.ReplicatedStorage.Remotes.Items["Parrying Dagger"].parry:FireServer()
-                end
-            end)
-        else
-            -- Используем стандартный метод через ЛКМ
-            spamActive = true
-            Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
-            task.spawn(function()
-                task.wait(0.01)
-                Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
-                spamActive = false
-            end)
-        end
+        -- Используем стандартный метод через ЛКМ
+        spamActive = true
+        Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
+        task.spawn(function()
+            task.wait(0.01)
+            Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
+            spamActive = false
+        end)
     end
 
     local function Enable()
@@ -589,7 +644,7 @@ local AutoParry = (function()
         
         Survivor.Connections.AutoParry = Nexus.Services.RunService.Heartbeat:Connect(function()
             if not Nexus.States.AutoParryEnabled then
-                if spamActive and not useRemoteEvent then 
+                if spamActive then 
                     spamActive = false; 
                     Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0) 
                 end
@@ -597,10 +652,10 @@ local AutoParry = (function()
             end
 
             if isBlockingInRange() then
-                if not spamActive or useRemoteEvent then
+                if not spamActive then
                     PerformParry()
                 end
-            elseif spamActive and not useRemoteEvent then
+            elseif spamActive then
                 spamActive = false
                 Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
             end
@@ -609,7 +664,7 @@ local AutoParry = (function()
 
     local function Disable()
         Nexus.States.AutoParryEnabled = false
-        if spamActive and not useRemoteEvent then 
+        if spamActive then 
             spamActive = false; 
             Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0) 
         end 
@@ -629,19 +684,7 @@ local AutoParry = (function()
             RANGE = tonumber(value) or 10
             print("AutoParry range set to: " .. RANGE)
         end,
-        GetRange = function() return RANGE end,
-        SetUseRemoteEvent = function(value)
-            useRemoteEvent = value
-            print("Parry method set to: " .. (value and "RemoteEvent" or "Mouse Click"))
-            
-            -- Перезапускаем AutoParry если он включен
-            if Nexus.States.AutoParryEnabled then
-                Disable()
-                task.wait(0.1)
-                Enable()
-            end
-        end,
-        GetUseRemoteEvent = function() return useRemoteEvent end
+        GetRange = function() return RANGE end
     }
 end)()
 
@@ -999,14 +1042,40 @@ local GateTool = (function()
     end
 
     local function UseGate()
-        local gateRemote = Nexus.Services.ReplicatedStorage.Remotes and Nexus.Services.ReplicatedStorage.Remotes.Items and Nexus.Services.ReplicatedStorage.Remotes.Items.Gate and Nexus.Services.ReplicatedStorage.Remotes.Items.Gate.gate
-        if gateRemote then 
-            pcall(function() 
-                gateRemote:FireServer() 
-            end)
-            return true 
+        -- Просто вызываем event "gate"
+        local success = pcall(function()
+            -- Пробуем найти и вызвать RemoteEvent "gate"
+            local remotes = Nexus.Services.ReplicatedStorage:FindFirstChild("Remotes")
+            if remotes then
+                local items = remotes:FindFirstChild("Items")
+                if items then
+                    local gate = items:FindFirstChild("Gate")
+                    if gate then
+                        local gateEvent = gate:FindFirstChild("gate")
+                        if gateEvent and gateEvent:IsA("RemoteEvent") then
+                            gateEvent:FireServer()
+                            print("Gate event fired")
+                            return true
+                        end
+                    end
+                end
+                
+                -- Альтернативный путь поиска
+                for _, remote in ipairs(remotes:GetDescendants()) do
+                    if remote:IsA("RemoteEvent") and (remote.Name:lower() == "gate" or remote.Name:find("gate")) then
+                        remote:FireServer()
+                        print("Gate event fired (alternative)")
+                        return true
+                    end
+                end
+            end
+        end)
+        
+        if not success then
+            print("Gate event not found or failed to fire")
         end
-        return false
+        
+        return success
     end
 
     local function Enable()
@@ -1016,7 +1085,7 @@ local GateTool = (function()
         toolInstance = CreateTool()
         if toolInstance then 
             toolConnection = toolInstance.Activated:Connect(function()
-                Nexus.SafeCallback(UseGate)
+                UseGate()
             end)
         end
     end
@@ -1046,7 +1115,7 @@ local GateTool = (function()
     Nexus.Player.CharacterAdded:Connect(function() 
         if Nexus.States.GateToolEnabled then 
             task.wait(2)
-            Nexus.SafeCallback(Enable)
+            Enable()
         end 
     end)
 
@@ -1229,20 +1298,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
-    -- ========== PARRY NO ANIMATION ==========
-    local ParryNoAnimationToggle = Tabs.Main:AddToggle("ParryNoAnimation", {
-        Title = "Parry no animation", 
-        Description = "Use RemoteEvent instead of mouse click for parry", 
-        Default = false
-    })
-
-    ParryNoAnimationToggle:OnChanged(function(v) 
-        Nexus.SafeCallback(function()
-            AutoParry.SetUseRemoteEvent(v)
-        end)
-    end)
-
-    -- ========== HEAL ==========
+    -- ========== gamemode ==========
     local HealToggle = Tabs.Main:AddToggle("Heal", {
         Title = "Gamemode", 
         Description = "", 
@@ -1302,8 +1358,8 @@ function Survivor.Init(nxs)
 
     -- ========== GATE TOOL ==========
     local GateToolToggle = Tabs.Main:AddToggle("GateTool", {
-        Title = "Gate Tool", 
-        Description = "", 
+        Title = "Fast use [Gate Tool]", 
+        Description = "Quick usage of the Gate Tool", 
         Default = false
     })
 
