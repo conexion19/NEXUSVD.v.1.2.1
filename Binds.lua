@@ -350,71 +350,6 @@ function Binds.Init(nxs)
         end
     })
     
-    -- ========== VISUAL BINDS ==========
-    Tabs.Binds:AddSection("Visual Binds")
-    
-    local NoShadowKeybind = Tabs.Binds:AddKeybind("NoShadowKeybind", {
-        Title = "No Shadow",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("NoShadow")
-                Binds.UpdateKeyState("NoShadow")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("NoShadow", "No Shadow", newKey)
-        end
-    })
-    
-    local NoFogKeybind = Tabs.Binds:AddKeybind("NoFogKeybind", {
-        Title = "No Fog",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("NoFog")
-                Binds.UpdateKeyState("NoFog")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("NoFog", "No Fog", newKey)
-        end
-    })
-    
-    local FullBrightKeybind = Tabs.Binds:AddKeybind("FullBrightKeybind", {
-        Title = "FullBright",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("FullBright")
-                Binds.UpdateKeyState("FullBright")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("FullBright", "FullBright", newKey)
-        end
-    })
-    
-    local TimeChangerKeybind = Tabs.Binds:AddKeybind("TimeChangerKeybind", {
-        Title = "Time Changer",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("TimeChanger")
-                Binds.UpdateKeyState("TimeChanger")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("TimeChanger", "Time Changer", newKey)
-        end
-    })
-    
-    -- ESP функции УБРАНЫ по требованию
-    
     print("✓ Binds module initialized")
 end
 
@@ -438,7 +373,7 @@ function Binds.CreateDisplayGUI()
     container.Name = "Container"
     container.BackgroundTransparency = 1
     container.Size = UDim2.new(0, 250, 0, 0) -- Увеличена ширина для длинного текста
-    container.Position = UDim2.new(1, -5, 0, 30) -- Правее, почти вплотную к краю
+    container.Position = UDim2.new(1, -5, 0, 60) -- Правее, почти вплотную к краю
     container.AnchorPoint = Vector2.new(1, 0)
     container.Parent = Binds.DisplayGui
     
