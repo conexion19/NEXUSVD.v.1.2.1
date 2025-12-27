@@ -1345,6 +1345,8 @@ function Visual.ClearAdvancedESP(plr)
         Visual.ESP.settings.ExitGates.Colorpicker = GateColorpicker
         Visual.ESP.settings.Windows.Colorpicker = WindowColorpicker
 
+        Tabs.Visual:AddSection("Advanced ESP Settings")
+
         Tabs.Visual:AddSection("ESP Components")
 
         local ESPBoxToggle = Tabs.Visual:AddToggle("ESPBox", {
