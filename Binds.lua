@@ -3,10 +3,12 @@ local Nexus = _G.Nexus
 
 local Binds = {
     Keybinds = {},
+    ActiveKeybinds = {},
     CursorUnlock = {
         enabled = false,
         connection = nil
-    }
+    },
+    DisplayGui = nil
 }
 
 function Binds.Init(nxs)
@@ -16,6 +18,9 @@ function Binds.Init(nxs)
     
     local Tabs = Nexus.Tabs
     if not Tabs.Binds then return end
+    
+    -- Создаем GUI для отображения биндов
+    Binds.CreateDisplayGUI()
     
     -- ========== CURSOR UNLOCK ==========
     Tabs.Binds:AddSection("Cursor Unlock")
@@ -36,6 +41,7 @@ function Binds.Init(nxs)
                     Content = "Cursor toggle key set to: " .. tostring(newKey),
                     Duration = 2
                 })
+                Binds.UpdateKeybindDisplay("CursorToggle", "Cursor Toggle", newKey)
             end)
         end
     })
@@ -55,7 +61,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("AutoParry", newKey)
+            Binds.HandleKeybindChange("AutoParry", "Auto Parry", newKey)
         end
     })
     
@@ -69,7 +75,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("AutoParryV2", newKey)
+            Binds.HandleKeybindChange("AutoParryV2", "Auto Parry V2", newKey)
         end
     })
     
@@ -83,7 +89,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("Heal", newKey)
+            Binds.HandleKeybindChange("Heal", "Heal", newKey)
         end
     })
     
@@ -97,7 +103,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("InstantHeal", newKey)
+            Binds.HandleKeybindChange("InstantHeal", "Instant Heal", newKey)
         end
     })
     
@@ -111,7 +117,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("SilentHeal", newKey)
+            Binds.HandleKeybindChange("SilentHeal", "Silent Heal", newKey)
         end
     })
     
@@ -125,7 +131,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("GateTool", newKey)
+            Binds.HandleKeybindChange("GateTool", "Gate Tool", newKey)
         end
     })
     
@@ -139,7 +145,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("NoHitbox", newKey)
+            Binds.HandleKeybindChange("NoHitbox", "No Hitbox", newKey)
         end
     })
     
@@ -153,7 +159,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("AntiFailGenerator", newKey)
+            Binds.HandleKeybindChange("AntiFailGenerator", "Anti-Fail Gen", newKey)
         end
     })
     
@@ -167,7 +173,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("AutoPerfectSkill", newKey)
+            Binds.HandleKeybindChange("AutoPerfectSkill", "Auto Skill", newKey)
         end
     })
     
@@ -184,7 +190,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("OneHitKill", newKey)
+            Binds.HandleKeybindChange("OneHitKill", "OneHit Kill", newKey)
         end
     })
     
@@ -198,7 +204,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("AntiBlind", newKey)
+            Binds.HandleKeybindChange("AntiBlind", "Anti Blind", newKey)
         end
     })
     
@@ -212,7 +218,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("NoSlowdown", newKey)
+            Binds.HandleKeybindChange("NoSlowdown", "No Slowdown", newKey)
         end
     })
     
@@ -226,7 +232,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("DestroyPallets", newKey)
+            Binds.HandleKeybindChange("DestroyPallets", "Destroy Pallets", newKey)
         end
     })
     
@@ -240,7 +246,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("BreakGenerator", newKey)
+            Binds.HandleKeybindChange("BreakGenerator", "Break Generator", newKey)
         end
     })
     
@@ -257,7 +263,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("InfiniteLunge", newKey)
+            Binds.HandleKeybindChange("InfiniteLunge", "Infinite Lunge", newKey)
         end
     })
     
@@ -271,7 +277,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("WalkSpeed", newKey)
+            Binds.HandleKeybindChange("WalkSpeed", "Walk Speed", newKey)
         end
     })
     
@@ -285,7 +291,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("Noclip", newKey)
+            Binds.HandleKeybindChange("Noclip", "Noclip", newKey)
         end
     })
     
@@ -299,7 +305,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("FOVChanger", newKey)
+            Binds.HandleKeybindChange("FOVChanger", "FOV Changer", newKey)
         end
     })
     
@@ -313,7 +319,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("Fly", newKey)
+            Binds.HandleKeybindChange("Fly", "Fly", newKey)
         end
     })
     
@@ -327,7 +333,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("FreeCamera", newKey)
+            Binds.HandleKeybindChange("FreeCamera", "Free Camera", newKey)
         end
     })
     
@@ -344,7 +350,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("NoShadow", newKey)
+            Binds.HandleKeybindChange("NoShadow", "No Shadow", newKey)
         end
     })
     
@@ -358,7 +364,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("NoFog", newKey)
+            Binds.HandleKeybindChange("NoFog", "No Fog", newKey)
         end
     })
     
@@ -372,7 +378,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("FullBright", newKey)
+            Binds.HandleKeybindChange("FullBright", "FullBright", newKey)
         end
     })
     
@@ -386,7 +392,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("TimeChanger", newKey)
+            Binds.HandleKeybindChange("TimeChanger", "Time Changer", newKey)
         end
     })
     
@@ -400,7 +406,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPSurvivors", newKey)
+            Binds.HandleKeybindChange("ESPSurvivors", "ESP Survivors", newKey)
         end
     })
     
@@ -414,7 +420,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPKillers", newKey)
+            Binds.HandleKeybindChange("ESPKillers", "ESP Killers", newKey)
         end
     })
     
@@ -428,7 +434,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPHooks", newKey)
+            Binds.HandleKeybindChange("ESPHooks", "ESP Hooks", newKey)
         end
     })
     
@@ -442,7 +448,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPGenerators", newKey)
+            Binds.HandleKeybindChange("ESPGenerators", "ESP Generators", newKey)
         end
     })
     
@@ -456,7 +462,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPPallets", newKey)
+            Binds.HandleKeybindChange("ESPPallets", "ESP Pallets", newKey)
         end
     })
     
@@ -470,7 +476,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPGates", newKey)
+            Binds.HandleKeybindChange("ESPGates", "ESP Gates", newKey)
         end
     })
     
@@ -484,11 +490,140 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPWindows", newKey)
+            Binds.HandleKeybindChange("ESPWindows", "ESP Windows", newKey)
         end
     })
     
     print("✓ Binds module initialized")
+end
+
+-- ========== DISPLAY GUI FUNCTIONS ==========
+
+function Binds.CreateDisplayGUI()
+    if Binds.DisplayGui then
+        Binds.DisplayGui:Destroy()
+    end
+    
+    local playerGui = Nexus.Player:WaitForChild("PlayerGui")
+    
+    Binds.DisplayGui = Instance.new("ScreenGui")
+    Binds.DisplayGui.Name = "KeybindsDisplay"
+    Binds.DisplayGui.DisplayOrder = 100
+    Binds.DisplayGui.ResetOnSpawn = false
+    Binds.DisplayGui.IgnoreGuiInset = true
+    Binds.DisplayGui.Parent = playerGui
+    
+    local container = Instance.new("Frame")
+    container.Name = "Container"
+    container.BackgroundTransparency = 1
+    container.Size = UDim2.new(0, 200, 1, -40)
+    container.Position = UDim2.new(1, -210, 0, 20)
+    container.AnchorPoint = Vector2.new(1, 0)
+    container.Parent = Binds.DisplayGui
+    
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Text = "KEYBINDS"
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    title.BackgroundTransparency = 0.7
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.TextXAlignment = Enum.TextXAlignment.Center
+    title.Parent = container
+    
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Name = "ScrollFrame"
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.Size = UDim2.new(1, 0, 1, -35)
+    scrollFrame.Position = UDim2.new(0, 0, 0, 35)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+    scrollFrame.ScrollBarThickness = 4
+    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scrollFrame.Parent = container
+    
+    local uiListLayout = Instance.new("UIListLayout")
+    uiListLayout.Padding = UDim.new(0, 2)
+    uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    uiListLayout.Parent = scrollFrame
+    
+    Binds.UpdateDisplay()
+end
+
+function Binds.UpdateDisplay()
+    if not Binds.DisplayGui then return end
+    
+    local scrollFrame = Binds.DisplayGui.Container.ScrollFrame
+    scrollFrame:ClearAllChildren()
+    
+    local sortedKeys = {}
+    for funcName, _ in pairs(Binds.ActiveKeybinds) do
+        table.insert(sortedKeys, funcName)
+    end
+    
+    table.sort(sortedKeys)
+    
+    for _, funcName in ipairs(sortedKeys) do
+        local data = Binds.ActiveKeybinds[funcName]
+        if data and data.key ~= "" then
+            Binds.CreateKeybindDisplay(scrollFrame, data.displayName, data.key)
+        end
+    end
+end
+
+function Binds.CreateKeybindDisplay(parent, displayName, key)
+    local frame = Instance.new("Frame")
+    frame.Name = "Keybind_" .. displayName
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    frame.BackgroundTransparency = 0.5
+    frame.Size = UDim2.new(1, -10, 0, 25)
+    frame.Position = UDim2.new(0, 5, 0, 0)
+    frame.Parent = parent
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "Name"
+    nameLabel.Text = displayName
+    nameLabel.Font = Enum.Font.Gotham
+    nameLabel.TextSize = 12
+    nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Size = UDim2.new(0.7, -5, 1, 0)
+    nameLabel.Position = UDim2.new(0, 5, 0, 0)
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = frame
+    
+    local keyLabel = Instance.new("TextLabel")
+    keyLabel.Name = "Key"
+    keyLabel.Text = tostring(key)
+    keyLabel.Font = Enum.Font.GothamBold
+    keyLabel.TextSize = 12
+    keyLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+    keyLabel.BackgroundTransparency = 1
+    keyLabel.Size = UDim2.new(0.3, 0, 1, 0)
+    keyLabel.Position = UDim2.new(0.7, 0, 0, 0)
+    keyLabel.TextXAlignment = Enum.TextXAlignment.Right
+    keyLabel.Parent = frame
+    
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 4)
+    uiCorner.Parent = frame
+end
+
+function Binds.UpdateKeybindDisplay(funcName, displayName, key)
+    if key and key ~= "" then
+        Binds.ActiveKeybinds[funcName] = {
+            displayName = displayName,
+            key = key
+        }
+        print("[Keybinds] " .. displayName .. " -> " .. tostring(key))
+    else
+        Binds.ActiveKeybinds[funcName] = nil
+    end
+    
+    Binds.UpdateDisplay()
 end
 
 -- ========== CURSOR UNLOCK FUNCTIONS ==========
@@ -577,14 +712,16 @@ function Binds.ToggleOption(optionName)
     end
 end
 
-function Binds.HandleKeybindChange(optionName, newKey)
-    print("Keybind changed for " .. optionName .. " to: " .. tostring(newKey))
+function Binds.HandleKeybindChange(funcName, displayName, newKey)
+    print("Keybind changed for " .. displayName .. " to: " .. tostring(newKey))
     
     Nexus.Fluent:Notify({
         Title = "Keybind Updated",
-        Content = optionName .. " key set to: " .. tostring(newKey),
+        Content = displayName .. " key set to: " .. tostring(newKey),
         Duration = 2
     })
+    
+    Binds.UpdateKeybindDisplay(funcName, displayName, newKey)
 end
 
 -- ========== CLEANUP ==========
@@ -592,6 +729,13 @@ end
 function Binds.Cleanup()
     Binds.DisableCursorUnlock()
     Binds.ResetCursorState()
+    
+    if Binds.DisplayGui then
+        Binds.DisplayGui:Destroy()
+        Binds.DisplayGui = nil
+    end
+    
+    Binds.ActiveKeybinds = {}
     
     print("Binds module cleaned up")
 end
