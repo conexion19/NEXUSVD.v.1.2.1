@@ -546,7 +546,13 @@ function Binds.UpdateDisplay()
     if not Binds.DisplayGui then return end
     
     local scrollFrame = Binds.DisplayGui.Container.ScrollFrame
-    scrollFrame:ClearAllChildren()
+    
+    -- Полностью очищаем старые элементы
+    for _, child in ipairs(scrollFrame:GetChildren()) do
+        if child:IsA("Frame") and child.Name:match("Keybind_") then
+            child:Destroy()
+        end
+    end
     
     local sortedKeys = {}
     for funcName, _ in pairs(Binds.ActiveKeybinds) do
@@ -562,6 +568,9 @@ function Binds.UpdateDisplay()
         end
     end
     
+    -- Ждем один кадр для обновления UIListLayout
+    task.wait(0.01)
+    
     -- Обновляем размер контейнера на основе количества элементов
     local itemCount = #sortedKeys
     local itemHeight = 28
@@ -571,6 +580,8 @@ function Binds.UpdateDisplay()
     local totalHeight = (itemHeight + padding) * itemCount - padding
     if totalHeight > maxHeight then
         totalHeight = maxHeight
+    elseif totalHeight < 40 then
+        totalHeight = 40 -- Минимальная высота
     end
     
     Binds.DisplayGui.Container.Size = UDim2.new(0, 180, 0, totalHeight)
@@ -578,12 +589,12 @@ end
 
 function Binds.CreateKeybindDisplay(parent, displayName, key)
     local frame = Instance.new("Frame")
-    frame.Name = "Keybind_" .. displayName
+    frame.Name = "Keybind_" .. displayName:gsub("%s+", "_")
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     frame.BackgroundTransparency = 0.2
     frame.Size = UDim2.new(1, 0, 0, 24)
     frame.Parent = parent
-    frame.LayoutOrder = #parent:GetChildren()
+    -- LayoutOrder будет автоматически назначен UIListLayout
     
     local uiCorner = Instance.new("UICorner")
     uiCorner.CornerRadius = UDim.new(0, 4)
