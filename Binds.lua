@@ -35,14 +35,7 @@ function Binds.Init(nxs)
             end)
         end,
         ChangedCallback = function(newKey)
-            Nexus.SafeCallback(function()
-                Nexus.Fluent:Notify({
-                    Title = "Keybind Updated",
-                    Content = "Cursor toggle key set to: " .. tostring(newKey),
-                    Duration = 2
-                })
-                Binds.UpdateKeybindDisplay("CursorToggle", "Cursor Toggle", newKey)
-            end)
+            Binds.UpdateKeybindDisplay("CursorToggle", "Cursor Toggle", newKey)
         end
     })
     
@@ -420,110 +413,7 @@ function Binds.Init(nxs)
         end
     })
     
-    local ESPSurvivorsKeybind = Tabs.Binds:AddKeybind("ESPSurvivorsKeybind", {
-        Title = "Survivors ESP",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("ESPSurvivors")
-                Binds.UpdateKeyState("ESPSurvivors")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPSurvivors", "ESP Survivors", newKey)
-        end
-    })
-    
-    local ESPKillersKeybind = Tabs.Binds:AddKeybind("ESPKillersKeybind", {
-        Title = "Killers ESP",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("ESPKillers")
-                Binds.UpdateKeyState("ESPKillers")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPKillers", "ESP Killers", newKey)
-        end
-    })
-    
-    local ESPHooksKeybind = Tabs.Binds:AddKeybind("ESPHooksKeybind", {
-        Title = "Hooks ESP",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("ESPHooks")
-                Binds.UpdateKeyState("ESPHooks")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPHooks", "ESP Hooks", newKey)
-        end
-    })
-    
-    local ESPGeneratorsKeybind = Tabs.Binds:AddKeybind("ESPGeneratorsKeybind", {
-        Title = "Generators ESP",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("ESPGenerators")
-                Binds.UpdateKeyState("ESPGenerators")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPGenerators", "ESP Generators", newKey)
-        end
-    })
-    
-    local ESPPalletsKeybind = Tabs.Binds:AddKeybind("ESPPalletsKeybind", {
-        Title = "Pallets ESP",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("ESPPallets")
-                Binds.UpdateKeyState("ESPPallets")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPPallets", "ESP Pallets", newKey)
-        end
-    })
-    
-    local ESPGatesKeybind = Tabs.Binds:AddKeybind("ESPGatesKeybind", {
-        Title = "Exit Gates ESP",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("ESPGates")
-                Binds.UpdateKeyState("ESPGates")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPGates", "ESP Gates", newKey)
-        end
-    })
-    
-    local ESPWindowsKeybind = Tabs.Binds:AddKeybind("ESPWindowsKeybind", {
-        Title = "Windows ESP",
-        Mode = "Toggle",
-        Default = "",
-        Callback = function()
-            Nexus.SafeCallback(function()
-                Binds.ToggleOption("ESPWindows")
-                Binds.UpdateKeyState("ESPWindows")
-            end)
-        end,
-        ChangedCallback = function(newKey)
-            Binds.HandleKeybindChange("ESPWindows", "ESP Windows", newKey)
-        end
-    })
+    -- ESP функции УБРАНЫ по требованию
     
     print("✓ Binds module initialized")
 end
@@ -547,8 +437,8 @@ function Binds.CreateDisplayGUI()
     local container = Instance.new("Frame")
     container.Name = "Container"
     container.BackgroundTransparency = 1
-    container.Size = UDim2.new(0, 180, 0, 0)
-    container.Position = UDim2.new(1, -10, 0, 10)
+    container.Size = UDim2.new(0, 250, 0, 0) -- Увеличена ширина для длинного текста
+    container.Position = UDim2.new(1, -5, 0, 10) -- Правее, почти вплотную к краю
     container.AnchorPoint = Vector2.new(1, 0)
     container.Parent = Binds.DisplayGui
     
@@ -611,7 +501,7 @@ function Binds.UpdateDisplay()
         totalHeight = 0
     end
     
-    Binds.DisplayGui.Container.Size = UDim2.new(0, 180, 0, totalHeight)
+    Binds.DisplayGui.Container.Size = UDim2.new(0, 250, 0, totalHeight)
 end
 
 function Binds.CreateKeybindDisplay(parent, displayName, key, funcName)
@@ -624,6 +514,9 @@ function Binds.CreateKeybindDisplay(parent, displayName, key, funcName)
     textLabel.BackgroundTransparency = 1
     textLabel.Size = UDim2.new(1, 0, 0, 20)
     textLabel.TextXAlignment = Enum.TextXAlignment.Right
+    textLabel.TextTruncate = Enum.TextTruncate.None -- Убираем обрезку текста
+    textLabel.TextWrapped = false -- Не переносить текст
+    textLabel.RichText = false
     textLabel.Parent = parent
     
     -- Получаем текущее состояние для этой функции
@@ -639,10 +532,7 @@ end
 function Binds.UpdateKeyColor(textLabel, isEnabled)
     if not textLabel or not textLabel.Parent then return end
     
-    -- Получаем текущий текст
-    local currentText = textLabel.Text
-    
-    -- Меняем цвет текста в зависимости от состояния
+    -- Меняем цвет всего текста (и названия и клавиши) в зависимости от состояния
     if isEnabled then
         textLabel.TextColor3 = Color3.fromRGB(0, 255, 0) -- Зеленый при включении
     else
@@ -664,8 +554,14 @@ function Binds.UpdateKeyState(funcName)
         end
     end
     
-    -- Обновляем цвет текста
-    Binds.UpdateKeybindDisplay(funcName)
+    -- Обновляем цвет текста в отображении
+    if Binds.DisplayGui then
+        local scrollFrame = Binds.DisplayGui.Container.ScrollFrame
+        local textLabel = scrollFrame:FindFirstChild("Keybind_" .. funcName)
+        if textLabel then
+            Binds.UpdateKeyColor(textLabel, Binds.KeyStates[funcName])
+        end
+    end
 end
 
 function Binds.UpdateKeybindDisplay(funcName, displayName, key)
@@ -698,7 +594,7 @@ function Binds.ToggleCursorUnlock()
     end
     
     -- Обновляем цвет для CursorToggle
-    Binds.UpdateKeybindDisplay("CursorToggle")
+    Binds.UpdateKeyState("CursorToggle")
 end
 
 function Binds.EnableCursorUnlock()
@@ -717,11 +613,6 @@ function Binds.EnableCursorUnlock()
         end)
     end
     
-    Nexus.Fluent:Notify({
-        Title = "Cursor Unlock",
-        Content = "Cursor unlocked and visible",
-        Duration = 2
-    })
     print("Cursor unlocked - cursor visible")
 end
 
@@ -739,11 +630,6 @@ function Binds.DisableCursorUnlock()
         Nexus.Services.UserInputService.MouseIconEnabled = false
     end)
     
-    Nexus.Fluent:Notify({
-        Title = "Cursor Unlock", 
-        Content = "Cursor locked and hidden",
-        Duration = 2
-    })
     print("Cursor locked - cursor hidden")
 end
 
@@ -768,23 +654,11 @@ function Binds.ToggleOption(optionName)
     if option then
         local currentState = option.Value
         option:SetValue(not currentState)
-        
-        Nexus.Fluent:Notify({
-            Title = "Keybind",
-            Content = optionName .. " " .. (not currentState and "enabled" or "disabled"),
-            Duration = 2
-        })
     end
 end
 
 function Binds.HandleKeybindChange(funcName, displayName, newKey)
     print("Keybind changed for " .. displayName .. " to: " .. tostring(newKey))
-    
-    Nexus.Fluent:Notify({
-        Title = "Keybind Updated",
-        Content = displayName .. " key set to: " .. tostring(newKey),
-        Duration = 2
-    })
     
     Binds.UpdateKeybindDisplay(funcName, displayName, newKey)
 end
