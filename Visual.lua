@@ -4,7 +4,7 @@ local Visual = {
     Connections = {},
     ESP = {
         lastUpdate = 0,
-        UPDATE_INTERVAL = 0.1,
+        UPDATE_INTERVAL = 0.10,
         settings = {
             Survivors  = {Enabled=false, Color=Color3.fromRGB(100,255,100), Colorpicker = nil},
             Killers    = {Enabled=false, Color=Color3.fromRGB(255,100,100), Colorpicker = nil},
@@ -19,21 +19,45 @@ local Visual = {
         espLoopRunning = false,
         showGeneratorPercent = true
     },
-    PlayerESP = {
-        enabled = false,
+    AdvancedESP = {
         settings = {
-            Box_Color = Color3.fromRGB(255, 0, 0),
-            Box_Thickness = 2,
-            Team_Check = false,
-            Team_Color = false,
-            Autothickness = true,
-            Show_Names = true,
-            Show_HealthBar = true
+            enabled = false,
+            name = true,
+            distance = true,
+            healthbar = true,
+            box = true,
+            boxType = "full",
+            bones = true,
+            boneColorName = "White",
+            tracers = true,
+            tracerColorName = "White",
+            scale = 1.5,
+            healthBarTopColorName = "DarkGreen",
+            healthBarMidColorName = "DarkOrange",
+            healthBarBottomColorName = "DarkRed",
+            stateColorName = "Orange",
+            boxOutline = true,
+            boxOutlineColorName = "Black",
+            boxOutlineThickness = 0.4,
+            boxColorName = "White",
+            boxFill = true,
+            boxFillColorName = "White",
+            boxFillTransparency = 0.9,
+            healthBarLeftOffset = 10
         },
         colorMap = {
+            Red = Color3.fromRGB(255,0,0),
+            DarkRed = Color3.fromRGB(100,0,0),
+            Green = Color3.fromRGB(0,255,0),
             DarkGreen = Color3.fromRGB(0,80,0),
+            Blue = Color3.fromRGB(0,0,255),
+            LightBlue = Color3.fromRGB(200,200,255),
+            Yellow = Color3.fromRGB(255,255,0),
+            Orange = Color3.fromRGB(255,165,0),
             DarkOrange = Color3.fromRGB(140,70,0),
-            DarkRed = Color3.fromRGB(100,0,0)
+            Purple = Color3.fromRGB(128,0,128),
+            White = Color3.fromRGB(255,255,255),
+            Black = Color3.fromRGB(0,0,0)
         },
         connections = {},
         espObjects = {},
@@ -52,29 +76,7 @@ local Visual = {
     }
 }
 
--- Вспомогательные функции для боксов
-function Visual.NewLine(color, thickness)
-    local line = Drawing.new("Line")
-    line.Visible = false
-    line.From = Vector2.new(0, 0)
-    line.To = Vector2.new(0, 0)
-    line.Color = color
-    line.Thickness = thickness
-    line.Transparency = 1
-    return line
-end
-
-function Visual.Vis(lib, state)
-    for i, v in pairs(lib) do
-        v.Visible = state
-    end
-end
-
-function Visual.Colorize(lib, color)
-    for i, v in pairs(lib) do
-        v.Color = color
-    end
-end
+-- ========== HELPER FUNCTIONS ==========
 
 function Visual.GetGeneratorProgress(gen)
     local progress = 0
@@ -246,6 +248,7 @@ function Visual.AddObjectToTrack(obj)
     if nameLower:find("generator") then 
         Visual.ESP.trackedObjects[obj] = "Generators"
     elseif nameLower:find("pallet") then
+        -- Если в названии есть "pallet", проверяем содержимое
         if Visual.IsValidPallet(obj) then
             Visual.ESP.trackedObjects[obj] = "Pallets"
         end
@@ -259,16 +262,19 @@ function Visual.AddObjectToTrack(obj)
 end
 
 function Visual.IsValidPallet(obj)
+    -- Проверка 1: сам объект называется "PalletPoint"
     if obj.Name:lower():find("palletpoint") then
         return true
     end
     
+    -- Проверка 2: объект содержит дочерний "PalletPoint"
     for _, child in ipairs(obj:GetChildren()) do
         if child.Name:lower():find("palletpoint") then
             return true
         end
     end
     
+    -- Проверка 3: объект является Model и имеет PrimaryPart
     if obj:IsA("Model") and obj.PrimaryPart then
         local primaryName = obj.PrimaryPart.Name:lower()
         if primaryName:find("palletpoint") or primaryName:find("pallet") then
@@ -300,6 +306,7 @@ function Visual.UpdateESP()
     if currentTime - Visual.ESP.lastUpdate < Visual.ESP.UPDATE_INTERVAL then return end
     Visual.ESP.lastUpdate = currentTime
     
+    -- Update players
     for _, targetPlayer in ipairs(Nexus.Services.Players:GetPlayers()) do
         if targetPlayer ~= Nexus.Player and targetPlayer.Character then
             local hrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -318,6 +325,7 @@ function Visual.UpdateESP()
         end
     end
     
+    -- Update objects
     for obj, typeName in pairs(Visual.ESP.trackedObjects) do
         if obj and obj.Parent then
             local setting = Visual.ESP.settings[typeName]
@@ -358,8 +366,10 @@ end
 function Visual.StopESP()
     Visual.ESP.espLoopRunning = false
     
+    -- Clear all ESP objects
     Visual.ClearAllESP()
     
+    -- Disconnect connections
     for _, connection in pairs(Visual.ESP.espConnections) do
         Nexus.safeDisconnect(connection)
     end
@@ -367,6 +377,7 @@ function Visual.StopESP()
 end
 
 function Visual.ClearAllESP()
+    -- Clear players
     for _, targetPlayer in ipairs(Nexus.Services.Players:GetPlayers()) do
         if targetPlayer.Character then
             Visual.ClearHighlight(targetPlayer.Character)
@@ -374,6 +385,7 @@ function Visual.ClearAllESP()
         end
     end
     
+    -- Clear objects
     for obj, _ in pairs(Visual.ESP.trackedObjects) do
         if obj and obj.Parent then
             Visual.ClearHighlight(obj)
@@ -414,138 +426,70 @@ function Visual.UpdateESPDisplay()
     end
 end
 
-function Visual.TogglePlayerESP(enabled)
-    Visual.PlayerESP.enabled = enabled
+-- ========== ADVANCED ESP SYSTEM ==========
+
+function Visual.ToggleAdvancedESP(enabled)
+    Visual.AdvancedESP.settings.enabled = enabled
     
     if enabled then
-        Visual.StartPlayerESP()
+        Visual.StartAdvancedESP()
     else
-        Visual.StopPlayerESP()
+        Visual.StopAdvancedESP()
     end
 end
 
-function Visual.ClearPlayerESP(plr)
-    local d = Visual.PlayerESP.espObjects[plr]
+function Visual.ClearAdvancedESP(plr)
+    local d = Visual.AdvancedESP.espObjects[plr]
     if d then
-        local function safeRemove(obj)
-            if obj and typeof(obj) == "userdata" then
-                pcall(function()
-                    if obj.Remove then
-                        obj:Remove()
-                    elseif obj.Destroy then
-                        obj:Destroy()
-                    end
-                    obj = nil
-                end)
+        local drawingObjects = {
+            d.BoxFill, d.Name, d.Distance, d.Tracer, d.HealthBg, 
+            d.HealthBar, d.HealthMask, d.HealthText, d.Box, d.BoxOutline
+        }
+        
+        for _, obj in ipairs(drawingObjects) do
+            if obj and typeof(obj) == "userdata" and obj.Remove then
+                pcall(function() obj:Remove() end)
             end
         end
         
-        -- Удаляем линии бокса
-        if d.BoxLines then
-            for _, line in pairs(d.BoxLines) do
-                safeRemove(line)
+        for i=1,24 do
+            if d["HealthStripe"..i] then
+                pcall(function() d["HealthStripe"..i]:Remove() end)
             end
         end
         
-        -- Удаляем часть для расчета
-        if d.BoxPart and d.BoxPart.Parent then
-            safeRemove(d.BoxPart)
-        end
-        
-        -- Удаляем имя и хилтбар
-        safeRemove(d.Name)
-        safeRemove(d.HealthBg)
-        safeRemove(d.HealthBar)
-        safeRemove(d.HealthMask)
-        safeRemove(d.HealthText)
-        
-        for i = 1, 24 do
-            safeRemove(d["HealthStripe"..i])
-        end
-        
-        for k, v in pairs(d) do
-            if typeof(v) == "userdata" then
-                d[k] = nil
+        if d.Bones then
+            for _, bone in ipairs(d.Bones) do
+                if bone and typeof(bone) == "userdata" and bone.Remove then
+                    pcall(function() bone:Remove() end)
+                end
             end
         end
         
-        Visual.PlayerESP.espObjects[plr] = nil
+        Visual.AdvancedESP.espObjects[plr] = nil
     end
     
-    if Visual.PlayerESP.playerConnections[plr] then
-        for connName, connection in pairs(Visual.PlayerESP.playerConnections[plr]) do
-            if connection and typeof(connection) == "RBXScriptConnection" then
-                pcall(function() connection:Disconnect() end)
-            end
-            Visual.PlayerESP.playerConnections[plr][connName] = nil
+    if Visual.AdvancedESP.playerConnections[plr] then
+        for _, connection in pairs(Visual.AdvancedESP.playerConnections[plr]) do
+            pcall(function() connection:Disconnect() end)
         end
-        Visual.PlayerESP.playerConnections[plr] = nil
+        Visual.AdvancedESP.playerConnections[plr] = nil
     end
 end
 
-function Visual.ForceCleanupDrawings()
-    for plr, d in pairs(Visual.PlayerESP.espObjects) do
-        if d then
-            local drawingObjects = {
-                d.Name, d.HealthBg, d.HealthBar, d.HealthMask, d.HealthText
-            }
-            
-            for _, obj in ipairs(drawingObjects) do
-                if obj and typeof(obj) == "userdata" then
-                    pcall(function() 
-                        obj.Visible = false
-                        task.wait()
-                        if obj.Remove then
-                            obj:Remove()
-                        end
-                    end)
-                end
-            end
-            
-            -- Удаляем линии бокса
-            if d.BoxLines then
-                for _, line in pairs(d.BoxLines) do
-                    if line and typeof(line) == "userdata" then
-                        pcall(function() 
-                            line.Visible = false
-                            if line.Remove then
-                                line:Remove()
-                            end
-                        end)
-                    end
-                end
-            end
-            
-            for i = 1, 24 do
-                local stripe = d["HealthStripe"..i]
-                if stripe and typeof(stripe) == "userdata" then
-                    pcall(function() 
-                        stripe.Visible = false
-                        if stripe.Remove then
-                            stripe:Remove()
-                        end
-                    end)
-                end
-            end
-            
-            -- Удаляем часть
-            if d.BoxPart and d.BoxPart.Parent then
-                pcall(function() d.BoxPart:Destroy() end)
-            end
-        end
+function Visual.CreateAdvancedESP(plr)
+    if Visual.AdvancedESP.espObjects[plr] then
+        Visual.ClearAdvancedESP(plr)
     end
     
-    Visual.PlayerESP.espObjects = {}
-end
-
-function Visual.CreatePlayerESP(plr)
-    if Visual.PlayerESP.espObjects[plr] then
-        Visual.ClearPlayerESP(plr)
-        task.wait(0.05)
-    end
+    local settings = Visual.AdvancedESP.settings
+    local colorMap = Visual.AdvancedESP.colorMap
     
-    local settings = Visual.PlayerESP.settings
-    local colorMap = Visual.PlayerESP.colorMap
+    local boneColor = colorMap[settings.boneColorName] or colorMap.White
+    local tracerColor = colorMap[settings.tracerColorName] or colorMap.White
+    local boxColor = colorMap[settings.boxColorName] or colorMap.White
+    local boxOutlineColor = colorMap[settings.boxOutlineColorName] or colorMap.Black
+    local boxFillColor = colorMap[settings.boxFillColorName] or colorMap.White
     
     local function create(tp, props)
         local o = Drawing.new(tp)
@@ -554,46 +498,27 @@ function Visual.CreatePlayerESP(plr)
     end
     
     local d = {
+        Bones = {},
+        BoxFill = nil,
         Name = nil,
+        Distance = nil,
+        Tracer = nil,
         HealthBg = nil,
         HealthBar = nil,
         HealthMask = nil,
         HealthText = nil,
-        BoxLines = {},
-        BoxPart = nil
+        Box = nil,
+        BoxOutline = nil
     }
     
-    -- Создаем линии для бокса
-    local boxColor = settings.Box_Color
-    local boxThickness = settings.Box_Thickness
+    d.BoxFill = create("Square",{
+        Thickness = 0,
+        Color = boxFillColor,
+        Visible = false,
+        Filled = true,
+        Transparency = 1 - (settings.boxFillTransparency or 0.9)
+    })
     
-    d.BoxLines = {
-        TL1 = Visual.NewLine(boxColor, boxThickness),
-        TL2 = Visual.NewLine(boxColor, boxThickness),
-        TR1 = Visual.NewLine(boxColor, boxThickness),
-        TR2 = Visual.NewLine(boxColor, boxThickness),
-        BL1 = Visual.NewLine(boxColor, boxThickness),
-        BL2 = Visual.NewLine(boxColor, boxThickness),
-        BR1 = Visual.NewLine(boxColor, boxThickness),
-        BR2 = Visual.NewLine(boxColor, boxThickness)
-    }
-    
-    -- Создаем часть для расчета
-    d.BoxPart = Instance.new("Part")
-    d.BoxPart.Parent = Nexus.Services.Workspace
-    d.BoxPart.Transparency = 1
-    d.BoxPart.CanCollide = false
-    d.BoxPart.Size = Vector3.new(1, 1, 1)
-    d.BoxPart.Position = Vector3.new(0, 0, 0)
-    
-    -- Создаем полоски для хилтбара
-    for i=1,24 do
-        d["HealthStripe"..i] = Drawing.new("Square")
-        d["HealthStripe"..i].Filled = true
-        d["HealthStripe"..i].Visible = false
-    end
-    
-    -- Создаем имя
     d.Name = create("Text",{
         Size = 20,
         Center = true,
@@ -602,24 +527,37 @@ function Visual.CreatePlayerESP(plr)
         Visible = false
     })
     
-    -- Создаем хилтбар
+    d.Distance = create("Text",{
+        Size = 16,
+        Center = true,
+        Outline = true,
+        Color = Color3.new(0.8,0.8,0.8),
+        Visible = false
+    })
+    
+    d.Tracer = create("Line",{
+        Thickness = 1.5,
+        Color = tracerColor,
+        Visible = false
+    })
+    
     d.HealthBg = Drawing.new("Square")
     d.HealthBg.Visible = false
     d.HealthBg.Filled = true
     d.HealthBg.Color = Color3.new(0,0,0)
     d.HealthBg.Transparency = 1
-
+    
     d.HealthBar = Drawing.new("Square")
     d.HealthBar.Visible = false
     d.HealthBar.Filled = true
     d.HealthBar.Transparency = 1
-
+    
     d.HealthMask = Drawing.new("Square")
     d.HealthMask.Visible = false
     d.HealthMask.Filled = true
     d.HealthMask.Color = Color3.new(0,0,0)
     d.HealthMask.Transparency = 0.3
-
+    
     d.HealthText = create("Text",{
         Size = 14,
         Center = true,
@@ -628,48 +566,70 @@ function Visual.CreatePlayerESP(plr)
         Visible = false
     })
     
-    Visual.PlayerESP.espObjects[plr] = d
+    d.Box = create("Square", {
+        Thickness = 1.7,
+        Color = boxColor,
+        Visible = false,
+        Filled = false
+    })
     
-    if not Visual.PlayerESP.playerConnections[plr] then
-        Visual.PlayerESP.playerConnections[plr] = {}
+    d.BoxOutline = create("Square", {
+        Thickness = 1.7 + (settings.boxOutlineThickness or 0.4) * 2,
+        Color = boxOutlineColor,
+        Visible = false,
+        Filled = false
+    })
+    
+    for i=1,14 do
+        d.Bones[i] = create("Line", {
+            Thickness = 1.5,
+            Color = boneColor,
+            Visible = false
+        })
+    end
+    
+    Visual.AdvancedESP.espObjects[plr] = d
+    
+    if not Visual.AdvancedESP.playerConnections[plr] then
+        Visual.AdvancedESP.playerConnections[plr] = {}
     end
     
     return d
 end
 
-function Visual.SetupPlayerESP(plr)
+function Visual.SetupPlayerAdvancedESP(plr)
     if plr == Nexus.Player then return end
     
-    Visual.CreatePlayerESP(plr)
+    Visual.CreateAdvancedESP(plr)
     
     local charAddedConnection = plr.CharacterAdded:Connect(function(char)
         wait(0.5)
         
-        if not Visual.PlayerESP.espObjects[plr] then
-            Visual.CreatePlayerESP(plr)
+        if not Visual.AdvancedESP.espObjects[plr] then
+            Visual.CreateAdvancedESP(plr)
         end
         
         local humanoid = char:WaitForChild("Humanoid", 5)
         if humanoid then
-            if Visual.PlayerESP.playerConnections[plr] then
-                if Visual.PlayerESP.playerConnections[plr].died then
-                    Visual.PlayerESP.playerConnections[plr].died:Disconnect()
+            if Visual.AdvancedESP.playerConnections[plr] then
+                if Visual.AdvancedESP.playerConnections[plr].died then
+                    Visual.AdvancedESP.playerConnections[plr].died:Disconnect()
                 end
                 
-                Visual.PlayerESP.playerConnections[plr].died = humanoid.Died:Connect(function()
-                    Visual.ClearPlayerESP(plr)
+                Visual.AdvancedESP.playerConnections[plr].died = humanoid.Died:Connect(function()
+                    Visual.ClearAdvancedESP(plr)
                 end)
             end
         end
     end)
     
     local charRemovingConnection = plr.CharacterRemoving:Connect(function()
-        Visual.ClearPlayerESP(plr)
+        Visual.ClearAdvancedESP(plr)
     end)
     
-    if Visual.PlayerESP.playerConnections[plr] then
-        Visual.PlayerESP.playerConnections[plr].charAdded = charAddedConnection
-        Visual.PlayerESP.playerConnections[plr].charRemoving = charRemovingConnection
+    if Visual.AdvancedESP.playerConnections[plr] then
+        Visual.AdvancedESP.playerConnections[plr].charAdded = charAddedConnection
+        Visual.AdvancedESP.playerConnections[plr].charRemoving = charRemovingConnection
     end
     
     if plr.Character then
@@ -679,9 +639,9 @@ function Visual.SetupPlayerESP(plr)
             
             local humanoid = char:FindFirstChildOfClass("Humanoid")
             if humanoid then
-                if Visual.PlayerESP.playerConnections[plr] then
-                    Visual.PlayerESP.playerConnections[plr].died = humanoid.Died:Connect(function()
-                        Visual.ClearPlayerESP(plr)
+                if Visual.AdvancedESP.playerConnections[plr] then
+                    Visual.AdvancedESP.playerConnections[plr].died = humanoid.Died:Connect(function()
+                        Visual.ClearAdvancedESP(plr)
                     end)
                 end
             end
@@ -689,36 +649,43 @@ function Visual.SetupPlayerESP(plr)
     end
 end
 
-function Visual.CleanupPlayerESP(plr)
-    Visual.ClearPlayerESP(plr)
+function Visual.CleanupPlayerAdvancedESP(plr)
+    Visual.ClearAdvancedESP(plr)
 end
 
 function Visual.GetHealthGradientColor(y, h)
-    local colorMap = Visual.PlayerESP.colorMap
+    local settings = Visual.AdvancedESP.settings
+    local colorMap = Visual.AdvancedESP.colorMap
     
     local t = 1 - (y / math.max(h, 1))
     if t >= 0.5 then
         local s = (t - 0.5) * 2
-        local midColor = colorMap.DarkOrange
-        local topColor = colorMap.DarkGreen
+        local midColor = colorMap[settings.healthBarMidColorName] or colorMap.DarkOrange
+        local topColor = colorMap[settings.healthBarTopColorName] or colorMap.DarkGreen
         return midColor:Lerp(topColor, s)
     else
         local s = t * 2
-        local bottomColor = colorMap.DarkRed
-        local midColor = colorMap.DarkOrange
+        local bottomColor = colorMap[settings.healthBarBottomColorName] or colorMap.DarkRed
+        local midColor = colorMap[settings.healthBarMidColorName] or colorMap.DarkOrange
         return bottomColor:Lerp(midColor, s)
     end
 end
 
-function Visual.UpdatePlayerESP()
-    if not Visual.PlayerESP.enabled then return end
+function Visual.IsR6(char)
+    return char:FindFirstChild("Torso") and not char:FindFirstChild("UpperTorso")
+end
+
+function Visual.UpdateAdvancedESP()
+    local settings = Visual.AdvancedESP.settings
+    if not settings.enabled then return end
     
     local Camera = Nexus.Camera
     local camPos = Camera.CFrame.Position
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
     
-    for plr, d in pairs(Visual.PlayerESP.espObjects) do
+    for plr, d in pairs(Visual.AdvancedESP.espObjects) do
         if not plr or not plr.Parent then
-            Visual.ClearPlayerESP(plr)
+            Visual.ClearAdvancedESP(plr)
             continue
         end
         
@@ -727,220 +694,256 @@ function Visual.UpdatePlayerESP()
             local hum = char:FindFirstChildOfClass("Humanoid")
             
             if hum and hum.Health <= 0 then
-                -- Скрываем все элементы
-                Visual.Vis(d.BoxLines, false)
+                if d.BoxFill then d.BoxFill.Visible = false end
+                if d.Box then d.Box.Visible = false end
+                if d.BoxOutline then d.BoxOutline.Visible = false end
                 if d.Name then d.Name.Visible = false end
+                if d.Distance then d.Distance.Visible = false end
                 if d.HealthBg then d.HealthBg.Visible = false end
                 if d.HealthText then d.HealthText.Visible = false end
                 for i=1,24 do
                     if d["HealthStripe"..i] then d["HealthStripe"..i].Visible = false end
                 end
+                if d.Bones then for _,line in ipairs(d.Bones) do line.Visible = false end end
+                if d.Tracer then d.Tracer.Visible = false end
                 continue
             end
             
             local root = char.HumanoidRootPart
             local head = char.Head
 
+            local function screenPosOrNil(part)
+                if part then
+                    local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen and pos.Z > 0 then 
+                        return Vector2.new(pos.X, pos.Y) 
+                    end
+                end
+                return nil
+            end
+
             local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
             local footPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 2.5, 0))
 
             if onScreen then
                 local rawHeight = footPos.Y - headPos.Y
-                local height = rawHeight
-                local x = headPos.X
-                local y = headPos.Y
+                local height = rawHeight * settings.scale
+                local width = (height / 2) * settings.scale
+                local x = headPos.X - width / 2
+                local y = headPos.Y - (height - rawHeight) / 2
+
+                -- Box Fill
+                if d.BoxFill then
+                    d.BoxFill.Position = Vector2.new(x, y)
+                    d.BoxFill.Size = Vector2.new(width, height)
+                    d.BoxFill.Color = Visual.AdvancedESP.colorMap[settings.boxFillColorName] or Visual.AdvancedESP.colorMap.White
+                    d.BoxFill.Filled = true
+                    d.BoxFill.Transparency = 1 - (settings.boxFillTransparency or 0.9)
+                    d.BoxFill.Visible = settings.boxFill
+                end
+
+                -- Box
+                if d.Box then
+                    d.Box.Position = Vector2.new(x, y)
+                    d.Box.Size = Vector2.new(width, height)
+                    d.Box.Color = Visual.AdvancedESP.colorMap[settings.boxColorName] or Visual.AdvancedESP.colorMap.White
+                    d.Box.Thickness = 1.7
+                    d.Box.Visible = settings.box
+                end
                 
-                -- Обновляем бокс
-                if d.BoxPart and d.BoxLines then
-                    -- Обновляем размер и позицию части для расчета
-                    d.BoxPart.Size = Vector3.new(root.Size.X, root.Size.Y * 1.5, root.Size.Z)
-                    d.BoxPart.CFrame = CFrame.new(root.CFrame.Position, Camera.CFrame.Position)
-                    
-                    local SizeX = d.BoxPart.Size.X
-                    local SizeY = d.BoxPart.Size.Y
-                    
-                    -- Рассчитываем углы бокса
-                    local TL = Camera:WorldToViewportPoint((d.BoxPart.CFrame * CFrame.new(SizeX, SizeY, 0)).p)
-                    local TR = Camera:WorldToViewportPoint((d.BoxPart.CFrame * CFrame.new(-SizeX, SizeY, 0)).p)
-                    local BL = Camera:WorldToViewportPoint((d.BoxPart.CFrame * CFrame.new(SizeX, -SizeY, 0)).p)
-                    local BR = Camera:WorldToViewportPoint((d.BoxPart.CFrame * CFrame.new(-SizeX, -SizeY, 0)).p)
-                    
-                    -- Определяем цвет бокса в зависимости от команды
-                    local boxColor = Visual.PlayerESP.settings.Box_Color
-                    if Visual.PlayerESP.settings.Team_Check then
-                        if plr.TeamColor == Nexus.Player.TeamColor then
-                            boxColor = Color3.fromRGB(0, 255, 0)
-                        else 
-                            boxColor = Color3.fromRGB(255, 0, 0)
-                        end
-                    end
-                    
-                    if Visual.PlayerESP.settings.Team_Color then
-                        boxColor = plr.TeamColor.Color
-                    end
-                    
-                    -- Обновляем цвет линий
-                    Visual.Colorize(d.BoxLines, boxColor)
-                    
-                    local ratio = (Camera.CFrame.p - root.Position).magnitude
-                    local offset = math.clamp(1/ratio*750, 2, 300)
-                    
-                    -- Обновляем позиции линий
-                    d.BoxLines.TL1.From = Vector2.new(TL.X, TL.Y)
-                    d.BoxLines.TL1.To = Vector2.new(TL.X + offset, TL.Y)
-                    d.BoxLines.TL2.From = Vector2.new(TL.X, TL.Y)
-                    d.BoxLines.TL2.To = Vector2.new(TL.X, TL.Y + offset)
+                -- Box Outline
+                if d.BoxOutline then
+                    local thickness = settings.boxOutlineThickness or 0.4
+                    d.BoxOutline.Position = Vector2.new(x - thickness, y - thickness)
+                    d.BoxOutline.Size = Vector2.new(width + thickness * 2, height + thickness * 2)
+                    d.BoxOutline.Color = Visual.AdvancedESP.colorMap[settings.boxOutlineColorName] or Visual.AdvancedESP.colorMap.Black
+                    d.BoxOutline.Thickness = thickness
+                    d.BoxOutline.Visible = settings.box and settings.boxOutline
+                end
 
-                    d.BoxLines.TR1.From = Vector2.new(TR.X, TR.Y)
-                    d.BoxLines.TR1.To = Vector2.new(TR.X - offset, TR.Y)
-                    d.BoxLines.TR2.From = Vector2.new(TR.X, TR.Y)
-                    d.BoxLines.TR2.To = Vector2.new(TR.X, TR.Y + offset)
+                -- Name
+                if d.Name then
+                    d.Name.Text = plr.Name
+                    d.Name.Size = 20
+                    d.Name.Position = Vector2.new(headPos.X, y - 22)
+                    d.Name.Visible = settings.name
+                end
 
-                    d.BoxLines.BL1.From = Vector2.new(BL.X, BL.Y)
-                    d.BoxLines.BL1.To = Vector2.new(BL.X + offset, BL.Y)
-                    d.BoxLines.BL2.From = Vector2.new(BL.X, BL.Y)
-                    d.BoxLines.BL2.To = Vector2.new(BL.X, BL.Y - offset)
+                -- Distance
+                if d.Distance then
+                    local dist = math.floor((root.Position - camPos).Magnitude)
+                    d.Distance.Text = dist .. "m"
+                    d.Distance.Size = 16
+                    d.Distance.Position = Vector2.new(headPos.X, y + height + 6)
+                    d.Distance.Visible = settings.distance
+                end
 
-                    d.BoxLines.BR1.From = Vector2.new(BR.X, BR.Y)
-                    d.BoxLines.BR1.To = Vector2.new(BR.X - offset, BR.Y)
-                    d.BoxLines.BR2.From = Vector2.new(BR.X, BR.Y)
-                    d.BoxLines.BR2.To = Vector2.new(BR.X, BR.Y - offset)
+                -- Health Bar
+                if d.HealthBg and d.HealthBar and d.HealthText then
+                    local barX = x - (settings.healthBarLeftOffset or 10)
+                    local barY = y
+                    local barWidth = 6
+                    local barHeight = height
                     
-                    -- Показываем линии
-                    Visual.Vis(d.BoxLines, true)
+                    d.HealthBg.Position = Vector2.new(barX, barY)
+                    d.HealthBg.Size = Vector2.new(barWidth, barHeight)
+                    d.HealthBg.Visible = settings.healthbar
                     
-                    -- Обновляем толщину
-                    if Visual.PlayerESP.settings.Autothickness then
-                        local distance = (Nexus.Player.Character.HumanoidRootPart.Position - d.BoxPart.Position).magnitude
-                        local value = math.clamp(1/distance*100, 1, 4)
-                        for _, line in pairs(d.BoxLines) do
-                            line.Thickness = value
-                        end
-                    else 
-                        for _, line in pairs(d.BoxLines) do
-                            line.Thickness = Visual.PlayerESP.settings.Box_Thickness
-                        end
-                    end
-                    
-                    -- Позиция для имени (вверху по центру бокса)
-                    local nameY = math.min(TL.Y, TR.Y) - 25
-                    local nameX = (TL.X + TR.X) / 2
-                    
-                    if d.Name and Visual.PlayerESP.settings.Show_Names then
-                        d.Name.Text = plr.Name
-                        d.Name.Size = 20
-                        d.Name.Position = Vector2.new(nameX, nameY)
-                        d.Name.Visible = true
-                    elseif d.Name then
-                        d.Name.Visible = false
-                    end
-                    
-                    -- Хилтбар (слева от бокса, той же высоты)
-                    if Visual.PlayerESP.settings.Show_HealthBar then
-                        local leftmostX = math.min(TL.X, BL.X) - 20  -- Левее левой стороны бокса
-                        local barY = math.min(TL.Y, TR.Y)
-                        local barHeight = math.max(BL.Y, BR.Y) - barY
-                        
+                    if settings.healthbar then
                         local HEALTH_STRIPES = 24
                         local hpPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                        
-                        -- Обновляем полоски хилтбара
                         for i = 1, HEALTH_STRIPES do
                             local stripeY = barY + barHeight * (i - 1) / HEALTH_STRIPES
                             local stripeH = barHeight / HEALTH_STRIPES
                             local stripeColor = Visual.GetHealthGradientColor(stripeY - barY, barHeight)
-                            
                             if not d["HealthStripe"..i] then
                                 d["HealthStripe"..i] = Drawing.new("Square")
                                 d["HealthStripe"..i].Filled = true
                             end
-                            
                             local stripe = d["HealthStripe"..i]
                             stripe.Color = stripeColor
-                            stripe.Position = Vector2.new(leftmostX, stripeY)
-                            stripe.Size = Vector2.new(10, stripeH)  -- Ширина хилтбара 10 пикселей
+                            stripe.Position = Vector2.new(barX, stripeY)
+                            stripe.Size = Vector2.new(barWidth, stripeH)
                             stripe.Visible = (i - 1) / HEALTH_STRIPES < hpPerc
                             stripe.Transparency = 1
                         end
                         
-                        -- Текст здоровья
-                        if d.HealthText then
-                            d.HealthText.Text = tostring(math.floor(hum.Health))
-                            d.HealthText.Size = 14
-                            d.HealthText.Position = Vector2.new(leftmostX - 20, barY + barHeight / 2)
-                            d.HealthText.Visible = true
-                        end
+                        d.HealthText.Text = tostring(math.floor(hum.Health))
+                        d.HealthText.Size = 14
+                        d.HealthText.Position = Vector2.new(x - (settings.healthBarLeftOffset or 10) - 14, y + height / 2)
+                        d.HealthText.Visible = true
                     else
-                        -- Скрываем хилтбар, если выключен
                         for i = 1, 24 do
                             if d["HealthStripe"..i] then
                                 d["HealthStripe"..i].Visible = false
                             end
                         end
-                        if d.HealthText then
-                            d.HealthText.Visible = false
+                        d.HealthText.Visible = false
+                    end
+                end
+
+                -- Bones
+                if d.Bones then
+                    local bonesVisible = settings.bones
+                    local bones
+                    
+                    if Visual.IsR6(char) then
+                        bones = {
+                            {char:FindFirstChild("Head"), char:FindFirstChild("Torso")},
+                            {char:FindFirstChild("Torso"), char:FindFirstChild("Left Arm")},
+                            {char:FindFirstChild("Left Arm"), char:FindFirstChild("Left Leg")},
+                            {char:FindFirstChild("Torso"), char:FindFirstChild("Right Arm")},
+                            {char:FindFirstChild("Right Arm"), char:FindFirstChild("Right Leg")},
+                            {char:FindFirstChild("Torso"), char:FindFirstChild("Left Leg")},
+                            {char:FindFirstChild("Torso"), char:FindFirstChild("Right Leg")}
+                        }
+                    else
+                        bones = {
+                            {char:FindFirstChild("Head"), char:FindFirstChild("Neck")},
+                            {char:FindFirstChild("Neck"), char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")},
+                            {char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("LeftUpperArm") or char:FindFirstChild("Left Arm")},
+                            {char:FindFirstChild("LeftUpperArm") or char:FindFirstChild("Left Arm"), char:FindFirstChild("LeftLowerArm") or char:FindFirstChild("Left Forearm")},
+                            {char:FindFirstChild("LeftLowerArm") or char:FindFirstChild("Left Forearm"), char:FindFirstChild("LeftHand") or char:FindFirstChild("Left hand")},
+                            {char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("RightUpperArm") or char:FindFirstChild("Right Arm")},
+                            {char:FindFirstChild("RightUpperArm") or char:FindFirstChild("Right Arm"), char:FindFirstChild("RightLowerArm") or char:FindFirstChild("Right Forearm")},
+                            {char:FindFirstChild("RightLowerArm") or char:FindFirstChild("Right Forearm"), char:FindFirstChild("RightHand") or char:FindFirstChild("Right hand")},
+                            {char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("LeftUpperLeg") or char:FindFirstChild("Left Leg")},
+                            {char:FindFirstChild("LeftUpperLeg") or char:FindFirstChild("Left Leg"), char:FindFirstChild("LeftLowerLeg") or char:FindFirstChild("Left Shin")},
+                            {char:FindFirstChild("LeftLowerLeg") or char:FindFirstChild("Left Shin"), char:FindFirstChild("LeftFoot") or char:FindFirstChild("Left foot")},
+                            {char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg")},
+                            {char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg"), char:FindFirstChild("RightLowerLeg") or char:FindFirstChild("Right Shin")},
+                            {char:FindFirstChild("RightLowerLeg") or char:FindFirstChild("Right Shin"), char:FindFirstChild("RightFoot") or char:FindFirstChild("Right foot")}
+                        }
+                    end
+                    
+                    for i = 1, 14 do
+                        local line = d.Bones[i]
+                        if bones[i] and bones[i][1] and bones[i][2] then
+                            local p1 = screenPosOrNil(bones[i][1])
+                            local p2 = screenPosOrNil(bones[i][2])
+                            if p1 and p2 then
+                                line.From = p1
+                                line.To = p2
+                                line.Color = Visual.AdvancedESP.colorMap[settings.boneColorName] or Visual.AdvancedESP.colorMap.White
+                                line.Visible = bonesVisible
+                            else
+                                line.Visible = false
+                            end
+                        else
+                            line.Visible = false
                         end
                     end
                 end
-            else
-                -- Игрок не на экране - скрываем все
-                if d.BoxLines then
-                    Visual.Vis(d.BoxLines, false)
+
+                -- Tracer
+                if d.Tracer then
+                    local rootPos2D = Vector2.new(headPos.X, headPos.Y)
+                    d.Tracer.From = screenCenter
+                    d.Tracer.To = rootPos2D
+                    d.Tracer.Color = Visual.AdvancedESP.colorMap[settings.tracerColorName] or Visual.AdvancedESP.colorMap.White
+                    d.Tracer.Visible = settings.tracers
                 end
+            else
+                -- Hide all if not on screen
+                if d.BoxFill then d.BoxFill.Visible = false end
+                if d.Box then d.Box.Visible = false end
+                if d.BoxOutline then d.BoxOutline.Visible = false end
                 if d.Name then d.Name.Visible = false end
+                if d.Distance then d.Distance.Visible = false end
                 if d.HealthBg then d.HealthBg.Visible = false end
                 if d.HealthText then d.HealthText.Visible = false end
                 for i = 1, 24 do
                     if d["HealthStripe"..i] then d["HealthStripe"..i].Visible = false end
                 end
+                if d.Bones then for _, line in ipairs(d.Bones) do line.Visible = false end end
+                if d.Tracer then d.Tracer.Visible = false end
             end
         else
-            Visual.ClearPlayerESP(plr)
+            Visual.ClearAdvancedESP(plr)
         end
     end
 end
 
-function Visual.StartPlayerESP()
+function Visual.StartAdvancedESP()
+    -- Setup player connections
     Nexus.Services.Players.PlayerAdded:Connect(function(plr)
-        Visual.SetupPlayerESP(plr)
+        Visual.SetupPlayerAdvancedESP(plr)
     end)
     
     Nexus.Services.Players.PlayerRemoving:Connect(function(plr)
-        Visual.CleanupPlayerESP(plr)
+        Visual.CleanupPlayerAdvancedESP(plr)
     end)
     
+    -- Setup existing players
     for _, plr in pairs(Nexus.Services.Players:GetPlayers()) do
         if plr ~= Nexus.Player then
-            Visual.SetupPlayerESP(plr)
+            Visual.SetupPlayerAdvancedESP(plr)
         end
     end
     
-    Visual.PlayerESP.connections.renderStepped = Nexus.Services.RunService.RenderStepped:Connect(function()
-        Visual.UpdatePlayerESP()
+    -- Start update loop
+    Visual.AdvancedESP.connections.renderStepped = Nexus.Services.RunService.RenderStepped:Connect(function()
+        Visual.UpdateAdvancedESP()
     end)
 end
 
-function Visual.StopPlayerESP()
-    if Visual.PlayerESP.connections.renderStepped then
-        pcall(function() 
-            Visual.PlayerESP.connections.renderStepped:Disconnect() 
-        end)
-        Visual.PlayerESP.connections.renderStepped = nil
+function Visual.StopAdvancedESP()
+    -- Disconnect connections
+    for _, connection in pairs(Visual.AdvancedESP.connections) do
+        Nexus.safeDisconnect(connection)
+    end
+    Visual.AdvancedESP.connections = {}
+    
+    -- Clear all ESP objects
+    for plr, _ in pairs(Visual.AdvancedESP.espObjects) do
+        Visual.ClearAdvancedESP(plr)
     end
     
-    local playersToClear = {}
-    for plr, _ in pairs(Visual.PlayerESP.espObjects) do
-        table.insert(playersToClear, plr)
-    end
-    
-    for _, plr in ipairs(playersToClear) do
-        Visual.ClearPlayerESP(plr)
-    end
-    
-    table.clear(Visual.PlayerESP.espObjects)
-    table.clear(Visual.PlayerESP.playerConnections)
-    table.clear(Visual.PlayerESP.connections)
+    Visual.AdvancedESP.espObjects = {}
+    Visual.AdvancedESP.playerConnections = {}
 end
+
+-- ========== VISUAL EFFECTS FUNCTIONS ==========
 
 function Visual.ToggleNoShadow(enabled)
     Visual.Effects.noShadowEnabled = enabled
@@ -965,9 +968,11 @@ function Visual.ToggleNoFog(enabled)
     Visual.Effects.noFogEnabled = enabled
     
     if enabled then
+        -- Просто полностью убираем все эффекты тумана
         pcall(function()
             local lighting = Nexus.Services.Lighting
             
+            -- Убираем все эффекты тумана из Lighting
             for _, effect in ipairs(lighting:GetChildren()) do
                 if effect:IsA("Atmosphere") or 
                    effect.Name:lower():find("fog") or 
@@ -978,6 +983,7 @@ function Visual.ToggleNoFog(enabled)
                 end
             end
             
+            -- Убираем туман с карты
             local map = Nexus.Services.Workspace:FindFirstChild("Map")
             if map then
                 for _, obj in ipairs(map:GetDescendants()) do
@@ -991,11 +997,13 @@ function Visual.ToggleNoFog(enabled)
                 end
             end
             
+            -- Настраиваем параметры освещения
             lighting.FogEnd = 10000000
             lighting.FogStart = 0
             lighting.FogDensity = 0
             lighting.GlobalShadows = true
             
+            -- Запускаем постоянное обновление
             if Visual.ESP.espConnections.noFog then
                 Visual.ESP.espConnections.noFog:Disconnect()
             end
@@ -1009,6 +1017,7 @@ function Visual.ToggleNoFog(enabled)
             end)
         end)
     else
+        -- Просто отключаем соединение, не восстанавливая ничего
         if Visual.ESP.espConnections.noFog then
             Visual.ESP.espConnections.noFog:Disconnect()
             Visual.ESP.espConnections.noFog = nil
@@ -1053,12 +1062,15 @@ function Visual.SetTime(time)
     Nexus.Services.Lighting.ClockTime = time
 end
 
+-- ========== INITIALIZATION ==========
+
 function Visual.Init(nxs)
     Nexus = nxs
     
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
     
+    -- ========== VISUAL EFFECTS ==========
     local NoShadowToggle = Tabs.Visual:AddToggle("NoShadow", {
         Title = "No Shadow", 
         Description = "", 
@@ -1109,6 +1121,7 @@ function Visual.Init(nxs)
         Visual.ToggleTimeChanger(v)
     end)
 
+    -- Auto time update
     task.spawn(function()
         while true do
             task.wait(1)
@@ -1119,6 +1132,7 @@ function Visual.Init(nxs)
         end
     end)
 
+    -- ========== ESP SETTINGS ==========
     Tabs.Visual:AddSection("ESP Settings")
 
     local ShowGeneratorPercentToggle = Tabs.Visual:AddToggle("ESPShowGenPercent", {
@@ -1254,6 +1268,7 @@ function Visual.Init(nxs)
     end)
     WindowColorpicker:SetValueRGB(Color3.fromRGB(100, 200, 200))
 
+    -- Store colorpickers
     Visual.ESP.settings.Survivors.Colorpicker = SurvivorColorpicker
     Visual.ESP.settings.Killers.Colorpicker = KillerColorpicker
     Visual.ESP.settings.Hooks.Colorpicker = HookColorpicker
@@ -1261,83 +1276,84 @@ function Visual.Init(nxs)
     Visual.ESP.settings.ExitGates.Colorpicker = GateColorpicker
     Visual.ESP.settings.Windows.Colorpicker = WindowColorpicker
 
-    Tabs.Visual:AddSection("Player ESP Settings")
+    -- ========== ADVANCED ESP ==========
+    Tabs.Visual:AddSection("Advanced ESP Settings")
 
-    local PlayerESPToggle = Tabs.Visual:AddToggle("PlayerESP", {
-        Title = "Player ESP", 
-        Description = "Enable player ESP with boxes, names and healthbar", 
+    local AdvancedESPToggle = Tabs.Visual:AddToggle("AdvancedESP", {
+        Title = "Advanced ESP", 
+        Description = "Enable advanced player ESP system", 
         Default = false
     })
-    PlayerESPToggle:OnChanged(function(v)
-        Visual.TogglePlayerESP(v)
+    AdvancedESPToggle:OnChanged(function(v)
+        Visual.ToggleAdvancedESP(v)
     end)
 
-    local ShowNamesToggle = Tabs.Visual:AddToggle("ESPShowNames", {
-        Title = "Show Player Names", 
-        Description = "Show/hide player names above boxes", 
+    Tabs.Visual:AddSection("ESP Components")
+
+    local ESPBoxToggle = Tabs.Visual:AddToggle("ESPBox", {
+        Title = "Player Boxes", 
+        Description = "Show/hide player boxes", 
         Default = true
     })
-    ShowNamesToggle:OnChanged(function(v)
-        Visual.PlayerESP.settings.Show_Names = v
+    ESPBoxToggle:OnChanged(function(v)
+        Visual.AdvancedESP.settings.box = v
     end)
 
-    local ShowHealthBarToggle = Tabs.Visual:AddToggle("ESPShowHealthBar", {
-        Title = "Show Health Bar", 
-        Description = "Show/hide health bar on the left side of boxes", 
+    local ESPNamesToggle = Tabs.Visual:AddToggle("ESPNames", {
+        Title = "Player Names", 
+        Description = "Show/hide player names", 
         Default = true
     })
-    ShowHealthBarToggle:OnChanged(function(v)
-        Visual.PlayerESP.settings.Show_HealthBar = v
+    ESPNamesToggle:OnChanged(function(v)
+        Visual.AdvancedESP.settings.name = v
     end)
 
-    local BoxColorpicker = Tabs.Visual:AddColorpicker("BoxColorpicker", {
-        Title = "Box Color",
-        Default = Color3.fromRGB(255, 0, 0)
-    })
-    BoxColorpicker:OnChanged(function()
-        Visual.PlayerESP.settings.Box_Color = BoxColorpicker.Value
-    end)
-    BoxColorpicker:SetValueRGB(Color3.fromRGB(255, 0, 0))
-
-    local BoxThicknessSlider = Tabs.Visual:AddSlider("BoxThickness", {
-        Title = "Box Thickness", 
-        Description = "Thickness of box lines",
-        Default = 2,
-        Min = 1,
-        Max = 5,
-        Rounding = 1,
-        Callback = function(value)
-            Visual.PlayerESP.settings.Box_Thickness = value
-        end
-    })
-
-    local TeamCheckToggle = Tabs.Visual:AddToggle("TeamCheck", {
-        Title = "Team Check", 
-        Description = "Green for teammates, red for enemies", 
-        Default = false
-    })
-    TeamCheckToggle:OnChanged(function(v)
-        Visual.PlayerESP.settings.Team_Check = v
-    end)
-
-    local TeamColorToggle = Tabs.Visual:AddToggle("TeamColor", {
-        Title = "Team Color", 
-        Description = "Use team color for boxes", 
-        Default = false
-    })
-    TeamColorToggle:OnChanged(function(v)
-        Visual.PlayerESP.settings.Team_Color = v
-    end)
-
-    local AutoThicknessToggle = Tabs.Visual:AddToggle("AutoThickness", {
-        Title = "Auto Thickness", 
-        Description = "Automatically adjust box thickness based on distance", 
+    local ESPHealthBarToggle = Tabs.Visual:AddToggle("ESPHealthBar", {
+        Title = "Health Bar", 
+        Description = "Show/hide health bar", 
         Default = true
     })
-    AutoThicknessToggle:OnChanged(function(v)
-        Visual.PlayerESP.settings.Autothickness = v
+    ESPHealthBarToggle:OnChanged(function(v)
+        Visual.AdvancedESP.settings.healthbar = v
     end)
 
+    local ESPDistanceToggle = Tabs.Visual:AddToggle("ESPDistance", {
+        Title = "Distance", 
+        Description = "Show/hide distance to players", 
+        Default = true
+    })
+    ESPDistanceToggle:OnChanged(function(v)
+        Visual.AdvancedESP.settings.distance = v
+    end)
+
+    local ESPBoxFillToggle = Tabs.Visual:AddToggle("ESPBoxFill", {
+        Title = "Filled Box", 
+        Description = "Show/hide filled boxes", 
+        Default = true
+    })
+    ESPBoxFillToggle:OnChanged(function(v)
+        Visual.AdvancedESP.settings.boxFill = v
+    end)
+
+    local ESPTracersToggle = Tabs.Visual:AddToggle("ESPTracers", {
+        Title = "Tracers", 
+        Description = "Show/hide tracers to players", 
+        Default = true
+    })
+    ESPTracersToggle:OnChanged(function(v)
+        Visual.AdvancedESP.settings.tracers = v
+    end)
+
+    local ESPBonesToggle = Tabs.Visual:AddToggle("ESPBones", {
+        Title = "Player Bones", 
+        Description = "Show/hide player bones", 
+        Default = true
+    })
+    ESPBonesToggle:OnChanged(function(v)
+        Visual.AdvancedESP.settings.bones = v
+    end)
+
+    -- Start tracking objects
     task.spawn(function()
         task.wait(2)
         for _, obj in ipairs(Nexus.Services.Workspace:GetDescendants()) do
@@ -1354,17 +1370,19 @@ function Visual.Init(nxs)
     end)
 end
 
+-- ========== CLEANUP ==========
+
 function Visual.Cleanup()
     Visual.StopESP()
-    Visual.StopPlayerESP()
+    Visual.StopAdvancedESP()
     
-    Visual.ForceCleanupDrawings()
-    
+    -- Restore visual effects
     Visual.ToggleNoShadow(false)
     Visual.ToggleNoFog(false)
     Visual.ToggleFullBright(false)
     Visual.ToggleTimeChanger(false)
     
+    -- Disconnect all connections
     for _, connection in pairs(Visual.Connections) do
         Nexus.safeDisconnect(connection)
     end
@@ -1375,14 +1393,10 @@ function Visual.Cleanup()
     end
     Visual.ESP.espConnections = {}
     
-    for _, connection in pairs(Visual.PlayerESP.connections) do
+    for _, connection in pairs(Visual.AdvancedESP.connections) do
         Nexus.safeDisconnect(connection)
     end
-    Visual.PlayerESP.connections = {}
-    
-    task.wait(0.1)
-    pcall(function() game:GetService("RunService"):RenderStepped():Wait() end)
-    collectgarbage()
+    Visual.AdvancedESP.connections = {}
 end
 
 return Visual
