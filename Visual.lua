@@ -21,6 +21,7 @@ local Visual = {
         showGeneratorPercent = true
     },
     AdvancedESP = {
+        enabled = false, -- Добавлен флаг состояния
         settings = {
             enabled = false,
             name = true,
@@ -430,12 +431,47 @@ end
 -- ========== ADVANCED ESP SYSTEM ==========
 
 function Visual.ToggleAdvancedESP(enabled)
+    Visual.AdvancedESP.enabled = enabled
     Visual.AdvancedESP.settings.enabled = enabled
     
     if enabled then
         Visual.StartAdvancedESP()
     else
         Visual.StopAdvancedESP()
+    end
+    
+    print("Advanced ESP " .. (enabled and "enabled" or "disabled"))
+end
+
+function Visual.HideAllAdvancedESP()
+    -- Просто скрываем все ESP объекты, но не удаляем их
+    for plr, d in pairs(Visual.AdvancedESP.espObjects) do
+        if d then
+            local drawingObjects = {
+                d.BoxFill, d.Name, d.Distance, d.Tracer, d.HealthBg, 
+                d.HealthBar, d.HealthMask, d.HealthText, d.Box, d.BoxOutline
+            }
+            
+            for _, obj in ipairs(drawingObjects) do
+                if obj and typeof(obj) == "userdata" then
+                    pcall(function() obj.Visible = false end)
+                end
+            end
+            
+            for i=1,24 do
+                if d["HealthStripe"..i] then
+                    pcall(function() d["HealthStripe"..i].Visible = false end)
+                end
+            end
+            
+            if d.Bones then
+                for _, bone in ipairs(d.Bones) do
+                    if bone and typeof(bone) == "userdata" then
+                        pcall(function() bone.Visible = false end)
+                    end
+                end
+            end
+        end
     end
 end
 
@@ -481,7 +517,7 @@ end
 
 function Visual.CreateAdvancedESP(plr)
     if Visual.AdvancedESP.espObjects[plr] then
-        Visual.ClearAdvancedESP(plr)
+        return Visual.AdvancedESP.espObjects[plr]
     end
     
     local settings = Visual.AdvancedESP.settings
@@ -621,9 +657,7 @@ function Visual.SetupPlayerAdvancedESP(plr)
     local charAddedConnection = plr.CharacterAdded:Connect(function(char)
         task.wait(0.5)
         
-        if not Visual.AdvancedESP.espObjects[plr] then
-            Visual.CreateAdvancedESP(plr)
-        end
+        Visual.CreateAdvancedESP(plr)
         
         local humanoid = char:WaitForChild("Humanoid", 5)
         if humanoid then
@@ -633,14 +667,32 @@ function Visual.SetupPlayerAdvancedESP(plr)
                 end
                 
                 Visual.AdvancedESP.playerConnections[plr].died = humanoid.Died:Connect(function()
-                    Visual.ClearAdvancedESP(plr)
+                    -- При смерти просто скрываем ESP
+                    local d = Visual.AdvancedESP.espObjects[plr]
+                    if d then
+                        if d.BoxFill then d.BoxFill.Visible = false end
+                        if d.Box then d.Box.Visible = false end
+                        if d.BoxOutline then d.BoxOutline.Visible = false end
+                        if d.Name then d.Name.Visible = false end
+                        if d.Distance then d.Distance.Visible = false end
+                        if d.Tracer then d.Tracer.Visible = false end
+                    end
                 end)
             end
         end
     end)
     
     local charRemovingConnection = plr.CharacterRemoving:Connect(function()
-        Visual.ClearAdvancedESP(plr)
+        -- При удалении персонажа просто скрываем ESP
+        local d = Visual.AdvancedESP.espObjects[plr]
+        if d then
+            if d.BoxFill then d.BoxFill.Visible = false end
+            if d.Box then d.Box.Visible = false end
+            if d.BoxOutline then d.BoxOutline.Visible = false end
+            if d.Name then d.Name.Visible = false end
+            if d.Distance then d.Distance.Visible = false end
+            if d.Tracer then d.Tracer.Visible = false end
+        end
     end)
     
     if Visual.AdvancedESP.playerConnections[plr] then
@@ -657,7 +709,15 @@ function Visual.SetupPlayerAdvancedESP(plr)
             if humanoid then
                 if Visual.AdvancedESP.playerConnections[plr] then
                     Visual.AdvancedESP.playerConnections[plr].died = humanoid.Died:Connect(function()
-                        Visual.ClearAdvancedESP(plr)
+                        local d = Visual.AdvancedESP.espObjects[plr]
+                        if d then
+                            if d.BoxFill then d.BoxFill.Visible = false end
+                            if d.Box then d.Box.Visible = false end
+                            if d.BoxOutline then d.BoxOutline.Visible = false end
+                            if d.Name then d.Name.Visible = false end
+                            if d.Distance then d.Distance.Visible = false end
+                            if d.Tracer then d.Tracer.Visible = false end
+                        end
                     end)
                 end
             end
@@ -692,8 +752,12 @@ function Visual.IsR6(char)
 end
 
 function Visual.UpdateAdvancedESP()
+    if not Visual.AdvancedESP.enabled then
+        Visual.HideAllAdvancedESP()
+        return
+    end
+    
     local settings = Visual.AdvancedESP.settings
-    if not settings.enabled then return end
     
     local Camera = Nexus.Camera
     local camPos = Camera.CFrame.Position
@@ -795,7 +859,7 @@ function Visual.UpdateAdvancedESP()
                 end
 
                 -- Health Bar
-                if d.HealthBg and d.HealthBar and d.HealthText then
+                if d.HealthBg and d.HealthText then
                     local barX = x - (settings.healthBarLeftOffset or 10)
                     local barY = y
                     local barWidth = 6
@@ -913,20 +977,32 @@ function Visual.UpdateAdvancedESP()
                 if d.Tracer then d.Tracer.Visible = false end
             end
         else
-            Visual.ClearAdvancedESP(plr)
+            -- Если игрок без персонажа, просто скрываем ESP
+            if d then
+                if d.BoxFill then d.BoxFill.Visible = false end
+                if d.Box then d.Box.Visible = false end
+                if d.BoxOutline then d.BoxOutline.Visible = false end
+                if d.Name then d.Name.Visible = false end
+                if d.Distance then d.Distance.Visible = false end
+                if d.Tracer then d.Tracer.Visible = false end
+            end
         end
     end
 end
 
 function Visual.StartAdvancedESP()
-    -- Setup player connections
-    Visual.AdvancedESP.connections.playerAdded = Nexus.Services.Players.PlayerAdded:Connect(function(plr)
-        Visual.SetupPlayerAdvancedESP(plr)
-    end)
+    -- Setup player connections только если их еще нет
+    if not Visual.AdvancedESP.connections.playerAdded then
+        Visual.AdvancedESP.connections.playerAdded = Nexus.Services.Players.PlayerAdded:Connect(function(plr)
+            Visual.SetupPlayerAdvancedESP(plr)
+        end)
+    end
     
-    Visual.AdvancedESP.connections.playerRemoving = Nexus.Services.Players.PlayerRemoving:Connect(function(plr)
-        Visual.CleanupPlayerAdvancedESP(plr)
-    end)
+    if not Visual.AdvancedESP.connections.playerRemoving then
+        Visual.AdvancedESP.connections.playerRemoving = Nexus.Services.Players.PlayerRemoving:Connect(function(plr)
+            Visual.CleanupPlayerAdvancedESP(plr)
+        end)
+    end
     
     -- Setup existing players
     for _, plr in pairs(Nexus.Services.Players:GetPlayers()) do
@@ -935,26 +1011,23 @@ function Visual.StartAdvancedESP()
         end
     end
     
-    -- Start update loop
-    Visual.AdvancedESP.connections.renderStepped = Nexus.Services.RunService.RenderStepped:Connect(function()
-        Visual.UpdateAdvancedESP()
-    end)
+    -- Start update loop только если его еще нет
+    if not Visual.AdvancedESP.connections.renderStepped then
+        Visual.AdvancedESP.connections.renderStepped = Nexus.Services.RunService.RenderStepped:Connect(function()
+            Visual.UpdateAdvancedESP()
+        end)
+    end
 end
 
 function Visual.StopAdvancedESP()
-    -- Disconnect connections
-    for _, connection in pairs(Visual.AdvancedESP.connections) do
-        Nexus.safeDisconnect(connection)
-    end
-    Visual.AdvancedESP.connections = {}
+    -- Скрываем все ESP объекты
+    Visual.HideAllAdvancedESP()
     
-    -- Clear all ESP objects
-    for plr, _ in pairs(Visual.AdvancedESP.espObjects) do
-        Visual.ClearAdvancedESP(plr)
+    -- Отключаем только update loop, но сохраняем player connections
+    if Visual.AdvancedESP.connections.renderStepped then
+        Nexus.safeDisconnect(Visual.AdvancedESP.connections.renderStepped)
+        Visual.AdvancedESP.connections.renderStepped = nil
     end
-    
-    Visual.AdvancedESP.espObjects = {}
-    Visual.AdvancedESP.playerConnections = {}
 end
 
 -- ========== VISUAL EFFECTS FUNCTIONS ==========
@@ -982,11 +1055,9 @@ function Visual.ToggleNoFog(enabled)
     Visual.Effects.noFogEnabled = enabled
     
     if enabled then
-        -- Просто полностью убираем все эффекты тумана
         pcall(function()
             local lighting = Nexus.Services.Lighting
             
-            -- Убираем все эффекты тумана из Lighting
             for _, effect in ipairs(lighting:GetChildren()) do
                 if effect:IsA("Atmosphere") or 
                    effect.Name:lower():find("fog") or 
@@ -997,7 +1068,6 @@ function Visual.ToggleNoFog(enabled)
                 end
             end
             
-            -- Убираем туман с карты
             local map = Nexus.Services.Workspace:FindFirstChild("Map")
             if map then
                 for _, obj in ipairs(map:GetDescendants()) do
@@ -1011,13 +1081,11 @@ function Visual.ToggleNoFog(enabled)
                 end
             end
             
-            -- Настраиваем параметры освещения
             lighting.FogEnd = 10000000
             lighting.FogStart = 0
             lighting.FogDensity = 0
             lighting.GlobalShadows = true
             
-            -- Запускаем постоянное обновление
             if Visual.ESP.espConnections.noFog then
                 Visual.ESP.espConnections.noFog:Disconnect()
             end
@@ -1031,7 +1099,6 @@ function Visual.ToggleNoFog(enabled)
             end)
         end)
     else
-        -- Просто отключаем соединение, не восстанавливая ничего
         if Visual.ESP.espConnections.noFog then
             Visual.ESP.espConnections.noFog:Disconnect()
             Visual.ESP.espConnections.noFog = nil
@@ -1307,7 +1374,7 @@ function Visual.Init(nxs)
     local ESPBoxToggle = Tabs.Visual:AddToggle("ESPBox", {
         Title = "Player Boxes", 
         Description = "Show/hide player boxes", 
-        Default = false
+        Default = true
     })
     ESPBoxToggle:OnChanged(function(v)
         Visual.AdvancedESP.settings.box = v
@@ -1316,7 +1383,7 @@ function Visual.Init(nxs)
     local ESPNamesToggle = Tabs.Visual:AddToggle("ESPNames", {
         Title = "Player Names", 
         Description = "Show/hide player names", 
-        Default = false
+        Default = true
     })
     ESPNamesToggle:OnChanged(function(v)
         Visual.AdvancedESP.settings.name = v
@@ -1325,7 +1392,7 @@ function Visual.Init(nxs)
     local ESPHealthBarToggle = Tabs.Visual:AddToggle("ESPHealthBar", {
         Title = "Health Bar", 
         Description = "Show/hide health bar", 
-        Default = false
+        Default = true
     })
     ESPHealthBarToggle:OnChanged(function(v)
         Visual.AdvancedESP.settings.healthbar = v
@@ -1334,7 +1401,7 @@ function Visual.Init(nxs)
     local ESPDistanceToggle = Tabs.Visual:AddToggle("ESPDistance", {
         Title = "Distance", 
         Description = "Show/hide distance to players", 
-        Default = false
+        Default = true
     })
     ESPDistanceToggle:OnChanged(function(v)
         Visual.AdvancedESP.settings.distance = v
@@ -1343,7 +1410,7 @@ function Visual.Init(nxs)
     local ESPBoxFillToggle = Tabs.Visual:AddToggle("ESPBoxFill", {
         Title = "Filled Box", 
         Description = "Show/hide filled boxes", 
-        Default = false
+        Default = true
     })
     ESPBoxFillToggle:OnChanged(function(v)
         Visual.AdvancedESP.settings.boxFill = v
@@ -1352,7 +1419,7 @@ function Visual.Init(nxs)
     local ESPTracersToggle = Tabs.Visual:AddToggle("ESPTracers", {
         Title = "Tracers", 
         Description = "Show/hide tracers to players", 
-        Default = false
+        Default = true
     })
     ESPTracersToggle:OnChanged(function(v)
         Visual.AdvancedESP.settings.tracers = v
@@ -1361,7 +1428,7 @@ function Visual.Init(nxs)
     local ESPBonesToggle = Tabs.Visual:AddToggle("ESPBones", {
         Title = "Player Bones", 
         Description = "Show/hide player bones", 
-        Default = false
+        Default = true
     })
     ESPBonesToggle:OnChanged(function(v)
         Visual.AdvancedESP.settings.bones = v
