@@ -1,4 +1,3 @@
--- ========== MODULE DECLARATION ==========
 local Nexus = _G.Nexus
 
 local Visual = {
@@ -15,10 +14,23 @@ local Visual = {
             Windows    = {Enabled=false, Color=Color3.fromRGB(100,200,200), Colorpicker = nil},
             Hooks      = {Enabled=false, Color=Color3.fromRGB(100, 50, 150), Colorpicker = nil}
         },
+        boxESP = {
+            enabled = false,
+            teamCheck = false,
+            color = Color3.fromRGB(255, 255, 255),
+            colorpicker = nil
+        },
+        namesESP = {
+            enabled = false,
+            color = Color3.fromRGB(255, 255, 255),
+            colorpicker = nil
+        },
         trackedObjects = {},
         espConnections = {},
         espLoopRunning = false,
-        showGeneratorPercent = true
+        showGeneratorPercent = true,
+        boxObjects = {},
+        nameLabels = {}
     },
     Effects = {
         noShadowEnabled = false,
@@ -29,11 +41,11 @@ local Visual = {
         originalFogStart = nil,
         originalFogColor = nil,
         fogCache = nil,
-        originalClockTime = nil        
+        originalClockTime = nil,
+        originalAtmosphere = {},
+        originalPostEffects = {}
     }
 }
-
--- ========== HELPER FUNCTIONS ==========
 
 function Visual.GetGeneratorProgress(gen)
     local progress = 0
@@ -199,6 +211,21 @@ function Visual.GetRole(targetPlayer)
     return "Survivor"
 end
 
+function Visual.GetTeamColor(targetPlayer)
+    if not Visual.ESP.boxESP.teamCheck then
+        return Visual.ESP.boxESP.color
+    end
+    
+    local myRole = Visual.GetRole(Nexus.Player)
+    local targetRole = Visual.GetRole(targetPlayer)
+    
+    if myRole == targetRole then
+        return Color3.fromRGB(0, 0, 255)
+    else
+        return Color3.fromRGB(255, 0, 0)
+    end
+end
+
 function Visual.AddObjectToTrack(obj)
     local nameLower = obj.Name:lower()
     
@@ -238,6 +265,110 @@ function Visual.IsValidPallet(obj)
     return false
 end
 
+function Visual.CreateBoxESP(character)
+    if not character then return nil end
+    
+    local box = character:FindFirstChild("VD_Box")
+    if not box then
+        box = Instance.new("BoxHandleAdornment")
+        box.Name = "VD_Box"
+        box.Adornee = character
+        box.AlwaysOnTop = true
+        box.ZIndex = 10
+        box.Size = Vector3.new(4, 6, 4)
+        box.Color3 = Visual.GetTeamColor(Nexus.Services.Players:GetPlayerFromCharacter(character))
+        box.Transparency = 0.3
+        box.Parent = character
+    end
+    
+    Visual.ESP.boxObjects[character] = box
+    return box
+end
+
+function Visual.UpdateBoxESP(character)
+    if not character then return end
+    
+    local box = Visual.ESP.boxObjects[character]
+    if not box then
+        box = Visual.CreateBoxESP(character)
+    end
+    
+    if box then
+        local player = Nexus.Services.Players:GetPlayerFromCharacter(character)
+        if player then
+            box.Color3 = Visual.GetTeamColor(player)
+            box.Visible = Visual.ESP.boxESP.enabled
+        end
+    end
+end
+
+function Visual.RemoveBoxESP(character)
+    if character and Visual.ESP.boxObjects[character] then
+        local box = Visual.ESP.boxObjects[character]
+        pcall(function() box:Destroy() end)
+        Visual.ESP.boxObjects[character] = nil
+    end
+end
+
+function Visual.CreateNameESP(character)
+    if not character then return nil end
+    
+    local label = character:FindFirstChild("VD_NameLabel")
+    if not label then
+        label = Instance.new("BillboardGui")
+        label.Name = "VD_NameLabel"
+        label.Size = UDim2.new(0, 200, 0, 50)
+        label.StudsOffset = Vector3.new(0, 7, 0)
+        label.AlwaysOnTop = true
+        label.MaxDistance = 1000
+        label.Parent = character
+        
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Name = "NameText"
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.TextSize = 14
+        textLabel.Font = Enum.Font.SourceSansBold
+        textLabel.TextColor3 = Visual.ESP.namesESP.color
+        textLabel.TextStrokeTransparency = 0
+        textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        textLabel.Parent = label
+        
+        Visual.ESP.nameLabels[character] = label
+    end
+    
+    return label
+end
+
+function Visual.UpdateNameESP(character)
+    if not character then return end
+    
+    local label = Visual.ESP.nameLabels[character]
+    if not label then
+        label = Visual.CreateNameESP(character)
+    end
+    
+    if label then
+        local player = Nexus.Services.Players:GetPlayerFromCharacter(character)
+        if player then
+            local textLabel = label:FindFirstChild("NameText")
+            if textLabel then
+                textLabel.Text = player.Name
+                textLabel.TextColor3 = Visual.ESP.namesESP.color
+                label.Enabled = Visual.ESP.namesESP.enabled
+            end
+        end
+    end
+end
+
+function Visual.RemoveNameESP(character)
+    if character and Visual.ESP.nameLabels[character] then
+        local label = Visual.ESP.nameLabels[character]
+        pcall(function() label:Destroy() end)
+        Visual.ESP.nameLabels[character] = nil
+    end
+end
+
 function Visual.TrackObjects()
     Visual.ESP.trackedObjects = {}
     
@@ -273,6 +404,21 @@ function Visual.UpdateESP()
                     Visual.ClearHighlight(targetPlayer.Character)
                     Visual.ClearLabel(targetPlayer.Character)
                 end
+                
+                if Visual.ESP.boxESP.enabled then
+                    Visual.UpdateBoxESP(targetPlayer.Character)
+                else
+                    Visual.RemoveBoxESP(targetPlayer.Character)
+                end
+                
+                if Visual.ESP.namesESP.enabled then
+                    Visual.UpdateNameESP(targetPlayer.Character)
+                else
+                    Visual.RemoveNameESP(targetPlayer.Character)
+                end
+            else
+                Visual.RemoveBoxESP(targetPlayer.Character)
+                Visual.RemoveNameESP(targetPlayer.Character)
             end
         end
     end
@@ -330,8 +476,24 @@ function Visual.ClearAllESP()
         if targetPlayer.Character then
             Visual.ClearHighlight(targetPlayer.Character)
             Visual.ClearLabel(targetPlayer.Character)
+            Visual.RemoveBoxESP(targetPlayer.Character)
+            Visual.RemoveNameESP(targetPlayer.Character)
         end
     end
+    
+    for character, box in pairs(Visual.ESP.boxObjects) do
+        if box then
+            pcall(function() box:Destroy() end)
+        end
+    end
+    Visual.ESP.boxObjects = {}
+    
+    for character, label in pairs(Visual.ESP.nameLabels) do
+        if label then
+            pcall(function() label:Destroy() end)
+        end
+    end
+    Visual.ESP.nameLabels = {}
     
     for obj, _ in pairs(Visual.ESP.trackedObjects) do
         if obj and obj.Parent then
@@ -353,12 +515,57 @@ function Visual.ToggleESPSetting(settingName, enabled)
             end
         end
         
-        if anyEnabled and not Visual.ESP.espLoopRunning then
+        if (anyEnabled or Visual.ESP.boxESP.enabled or Visual.ESP.namesESP.enabled) and not Visual.ESP.espLoopRunning then
             Visual.StartESP()
-        elseif not anyEnabled and Visual.ESP.espLoopRunning then
+        elseif not anyEnabled and not Visual.ESP.boxESP.enabled and not Visual.ESP.namesESP.enabled and Visual.ESP.espLoopRunning then
             Visual.StopESP()
         end
     end
+end
+
+function Visual.ToggleBoxESP(enabled)
+    Visual.ESP.boxESP.enabled = enabled
+    
+    local anyEnabled = false
+    for _, setting in pairs(Visual.ESP.settings) do
+        if setting.Enabled then
+            anyEnabled = true
+            break
+        end
+    end
+    
+    if (anyEnabled or Visual.ESP.boxESP.enabled or Visual.ESP.namesESP.enabled) and not Visual.ESP.espLoopRunning then
+        Visual.StartESP()
+    elseif not anyEnabled and not Visual.ESP.boxESP.enabled and not Visual.ESP.namesESP.enabled and Visual.ESP.espLoopRunning then
+        Visual.StopESP()
+    else
+        Visual.UpdateESP()
+    end
+end
+
+function Visual.ToggleNamesESP(enabled)
+    Visual.ESP.namesESP.enabled = enabled
+    
+    local anyEnabled = false
+    for _, setting in pairs(Visual.ESP.settings) do
+        if setting.Enabled then
+            anyEnabled = true
+            break
+        end
+    end
+    
+    if (anyEnabled or Visual.ESP.boxESP.enabled or Visual.ESP.namesESP.enabled) and not Visual.ESP.espLoopRunning then
+        Visual.StartESP()
+    elseif not anyEnabled and not Visual.ESP.boxESP.enabled and not Visual.ESP.namesESP.enabled and Visual.ESP.espLoopRunning then
+        Visual.StopESP()
+    else
+        Visual.UpdateESP()
+    end
+end
+
+function Visual.ToggleTeamCheck(enabled)
+    Visual.ESP.boxESP.teamCheck = enabled
+    Visual.UpdateESP()
 end
 
 function Visual.UpdateESPColors()
@@ -372,8 +579,6 @@ function Visual.UpdateESPDisplay()
         Visual.UpdateESP()
     end
 end
-
--- ========== VISUAL EFFECTS FUNCTIONS ==========
 
 function Visual.ToggleNoShadow(enabled)
     Visual.Effects.noShadowEnabled = enabled
@@ -394,10 +599,58 @@ function Visual.ToggleNoShadow(enabled)
     end
 end
 
+function Visual.SaveOriginalFogSettings()
+    local lighting = Nexus.Services.Lighting
+    
+    Visual.Effects.originalFogEnd = lighting.FogEnd
+    Visual.Effects.originalFogStart = lighting.FogStart
+    Visual.Effects.originalFogColor = lighting.FogColor
+    Visual.Effects.originalAtmosphere = {}
+    Visual.Effects.originalPostEffects = {}
+    
+    for _, effect in ipairs(lighting:GetChildren()) do
+        if effect:IsA("Atmosphere") then
+            table.insert(Visual.Effects.originalAtmosphere, effect:Clone())
+        elseif effect:IsA("BloomEffect") or effect:IsA("BlurEffect") or effect:IsA("ColorCorrectionEffect") then
+            table.insert(Visual.Effects.originalPostEffects, effect:Clone())
+        end
+    end
+end
+
+function Visual.RestoreOriginalFogSettings()
+    local lighting = Nexus.Services.Lighting
+    
+    if Visual.Effects.originalFogEnd then
+        lighting.FogEnd = Visual.Effects.originalFogEnd
+    end
+    
+    if Visual.Effects.originalFogStart then
+        lighting.FogStart = Visual.Effects.originalFogStart
+    end
+    
+    if Visual.Effects.originalFogColor then
+        lighting.FogColor = Visual.Effects.originalFogColor
+    end
+    
+    for _, effect in ipairs(Visual.Effects.originalAtmosphere) do
+        local newEffect = effect:Clone()
+        newEffect.Parent = lighting
+    end
+    
+    for _, effect in ipairs(Visual.Effects.originalPostEffects) do
+        local newEffect = effect:Clone()
+        newEffect.Parent = lighting
+    end
+end
+
 function Visual.ToggleNoFog(enabled)
     Visual.Effects.noFogEnabled = enabled
     
     if enabled then
+        if not Visual.Effects.originalFogEnd then
+            Visual.SaveOriginalFogSettings()
+        end
+        
         pcall(function()
             local lighting = Nexus.Services.Lighting
             
@@ -446,6 +699,8 @@ function Visual.ToggleNoFog(enabled)
             Visual.ESP.espConnections.noFog:Disconnect()
             Visual.ESP.espConnections.noFog = nil
         end
+        
+        Visual.RestoreOriginalFogSettings()
     end
 end
 
@@ -486,15 +741,12 @@ function Visual.SetTime(time)
     Nexus.Services.Lighting.ClockTime = time
 end
 
--- ========== INITIALIZATION ==========
-
 function Visual.Init(nxs)
     Nexus = nxs
     
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
     
-    -- ========== VISUAL EFFECTS ==========
     local NoShadowToggle = Tabs.Visual:AddToggle("NoShadow", {
         Title = "No Shadow", 
         Description = "", 
@@ -555,7 +807,6 @@ function Visual.Init(nxs)
         end
     end)
 
-    -- ========== ESP SETTINGS ==========
     Tabs.Visual:AddSection("ESP Settings")
 
     local ShowGeneratorPercentToggle = Tabs.Visual:AddToggle("ESPShowGenPercent", {
@@ -698,6 +949,51 @@ function Visual.Init(nxs)
     Visual.ESP.settings.ExitGates.Colorpicker = GateColorpicker
     Visual.ESP.settings.Windows.Colorpicker = WindowColorpicker
 
+    Tabs.Visual:AddSection("Player ESP")
+
+    local BoxESPToggle = Tabs.Visual:AddToggle("BoxESP", {
+        Title = "Box ESP", 
+        Description = "Show/hide player boxes", 
+        Default = false
+    })
+    BoxESPToggle:OnChanged(function(v) Visual.ToggleBoxESP(v) end)
+
+    local BoxColorpicker = Tabs.Visual:AddColorpicker("BoxColorpicker", {
+        Title = "Box Color",
+        Default = Color3.fromRGB(255, 255, 255)
+    })
+    BoxColorpicker:OnChanged(function()
+        Visual.ESP.boxESP.color = BoxColorpicker.Value
+        Visual.UpdateESP()
+    end)
+    BoxColorpicker:SetValueRGB(Color3.fromRGB(255, 255, 255))
+    Visual.ESP.boxESP.colorpicker = BoxColorpicker
+
+    local NamesESPToggle = Tabs.Visual:AddToggle("NamesESP", {
+        Title = "Names ESP", 
+        Description = "Show/hide player names", 
+        Default = false
+    })
+    NamesESPToggle:OnChanged(function(v) Visual.ToggleNamesESP(v) end)
+
+    local NamesColorpicker = Tabs.Visual:AddColorpicker("NamesColorpicker", {
+        Title = "Names Color",
+        Default = Color3.fromRGB(255, 255, 255)
+    })
+    NamesColorpicker:OnChanged(function()
+        Visual.ESP.namesESP.color = NamesColorpicker.Value
+        Visual.UpdateESP()
+    end)
+    NamesColorpicker:SetValueRGB(Color3.fromRGB(255, 255, 255))
+    Visual.ESP.namesESP.colorpicker = NamesColorpicker
+
+    local TeamCheckToggle = Tabs.Visual:AddToggle("TeamCheck", {
+        Title = "Team Check", 
+        Description = "Red for enemies, blue for teammates", 
+        Default = false
+    })
+    TeamCheckToggle:OnChanged(function(v) Visual.ToggleTeamCheck(v) end)
+
     task.spawn(function()
         task.wait(2)
         for _, obj in ipairs(Nexus.Services.Workspace:GetDescendants()) do
@@ -713,8 +1009,6 @@ function Visual.Init(nxs)
         end)
     end)
 end
-
--- ========== CLEANUP ==========
 
 function Visual.Cleanup()
     Visual.StopESP()
