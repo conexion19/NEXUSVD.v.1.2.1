@@ -21,52 +21,18 @@ local function isKillerTeam()
 end
 
 local function setupTeamListener(callback)
-    -- Отслеживаем смену команды
     local teamChangedConn = Nexus.Player:GetPropertyChangedSignal("Team"):Connect(callback)
     
-    -- Отслеживаем вход в игру
     local function onCharacterAdded(character)
-        task.wait(0.5) -- Ждем загрузку персонажа
+        task.wait(0.5)
         callback()
     end
     
     local charAddedConn = Nexus.Player.CharacterAdded:Connect(onCharacterAdded)
     
-    -- Первоначальный вызов
     task.spawn(callback)
     
-    -- Возвращаем соединения для очистки
     return {teamChangedConn, charAddedConn}
-end
-
--- Определяем недостающие функции если их нет
-if not Nexus.getCharacter then
-    Nexus.getCharacter = function()
-        if Nexus.Player then
-            return Nexus.Player.Character
-        end
-        return nil
-    end
-end
-
-if not Nexus.getHumanoid then
-    Nexus.getHumanoid = function()
-        local char = Nexus.getCharacter()
-        if char then
-            return char:FindFirstChildOfClass("Humanoid")
-        end
-        return nil
-    end
-end
-
-if not Nexus.getRootPart then
-    Nexus.getRootPart = function()
-        local char = Nexus.getCharacter()
-        if char then
-            return char:FindFirstChild("HumanoidRootPart")
-        end
-        return nil
-    end
 end
 
 -- ========== USE FAKE SAW ==========
@@ -78,10 +44,7 @@ local UseFakeSaw = (function()
     
     local function getMaskedAlexAttackRemote()
         local success, result = pcall(function()
-            local remotes = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes")
-            local killers = remotes:WaitForChild("Killers")
-            local masked = killers:WaitForChild("Masked")
-            return masked:WaitForChild("alexattack")
+            return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Masked"):WaitForChild("alexattack")
         end)
         return success and result or nil
     end
@@ -91,20 +54,12 @@ local UseFakeSaw = (function()
         
         local Event = getMaskedAlexAttackRemote()
         if not Event then
-            print("Use Fake Saw: Remote not found")
             return
         end
         
-        -- Вызываем RemoteEvent
         local success = pcall(function()
             Event:FireServer()
         end)
-        
-        if success then
-            print("Use Fake Saw: Activated")
-        else
-            print("Use Fake Saw: Failed to activate")
-        end
     end
     
     local function updateFakeSawState()
@@ -113,17 +68,13 @@ local UseFakeSaw = (function()
                 connection:Disconnect()
             end
             
-            -- Запускаем циклический вызов каждые 0.5 секунд
             connection = Nexus.Services.RunService.Heartbeat:Connect(function()
                 if enabled and isKillerTeam() then
                     executeFakeSaw()
-                    task.wait(5)  -- Интервал между вызовами
+                    task.wait(5)
                 end
             end)
-            
-            print("Use Fake Saw: Activated for Killer team")
         elseif enabled then
-            print("Use Fake Saw: Waiting for Killer team...")
             if connection then
                 connection:Disconnect()
                 connection = nil
@@ -139,64 +90,42 @@ local UseFakeSaw = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.UseFakeSawEnabled = true end
-        print("Use Fake Saw: ON")
+        Nexus.States.UseFakeSawEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateFakeSawState))
         
-        -- Инициализируем состояние
         updateFakeSawState()
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.UseFakeSawEnabled = false end
-        print("Use Fake Saw: OFF")
+        Nexus.States.UseFakeSawEnabled = false
         
         if connection then
             connection:Disconnect()
             connection = nil
         end
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -221,7 +150,6 @@ local SpearCrosshair = (function()
     local crosshairX, crosshairY
     local teamListeners = {}
     
-    -- Создание прицела
     local function createCrosshair()
         crosshairX = Drawing.new("Line")
         crosshairY = Drawing.new("Line")
@@ -236,7 +164,6 @@ local SpearCrosshair = (function()
         crosshairY.Color = Color3.fromRGB(255, 0, 0)
         crosshairY.Visible = false
         
-        -- Обновление позиции прицела
         local function updatePosition()
             local viewport = Nexus.Services.Workspace.CurrentCamera.ViewportSize
             local centerX = viewport.X / 2
@@ -253,7 +180,6 @@ local SpearCrosshair = (function()
         updatePosition()
     end
     
-    -- Удаление прицела
     local function destroyCrosshair()
         if crosshairX then 
             pcall(function() 
@@ -269,7 +195,6 @@ local SpearCrosshair = (function()
         end
     end
     
-    -- Обновление видимости прицела
     local function updateCrosshair()
         if not crosshairX or not crosshairY then
             createCrosshair()
@@ -282,7 +207,7 @@ local SpearCrosshair = (function()
         crosshairY.Visible = shouldShow
         
         if shouldShow then
-            crosshairX.Color = Color3.fromRGB(255, 0, 0) -- Красный цвет
+            crosshairX.Color = Color3.fromRGB(255, 0, 0)
             crosshairY.Color = Color3.fromRGB(255, 0, 0)
         end
     end
@@ -293,9 +218,7 @@ local SpearCrosshair = (function()
             if not Killer.Connections.SpearCrosshair then
                 Killer.Connections.SpearCrosshair = Nexus.Services.RunService.RenderStepped:Connect(updateCrosshair)
             end
-            print("Spear Crosshair: Activated for Killer team")
         elseif enabled then
-            print("Spear Crosshair: Waiting for Killer team...")
             destroyCrosshair()
             if Killer.Connections.SpearCrosshair then
                 Killer.Connections.SpearCrosshair:Disconnect()
@@ -310,72 +233,47 @@ local SpearCrosshair = (function()
         end
     end
     
-    -- Основная функция
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.SpearCrosshairEnabled = true end
-        print("Spear Crosshair: ON")
+        Nexus.States.SpearCrosshairEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateSpearCrosshairState))
         
-        -- Инициализируем состояние
         updateSpearCrosshairState()
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.SpearCrosshairEnabled = false end
-        print("Spear Crosshair: OFF")
+        Nexus.States.SpearCrosshairEnabled = false
         
-        -- Удаляем прицел
         destroyCrosshair()
         
-        -- Отключаем соединения
         if Killer.Connections.SpearCrosshair then
             Killer.Connections.SpearCrosshair:Disconnect()
             Killer.Connections.SpearCrosshair = nil
         end
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -399,9 +297,7 @@ local DoubleTap = (function()
     
     local function GetBasicAttackRemote()
         local success, result = pcall(function()
-            local remotes = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes")
-            local attacks = remotes:WaitForChild("Attacks")
-            return attacks:WaitForChild("BasicAttack")
+            return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Attacks"):WaitForChild("BasicAttack")
         end)
         return success and result or nil
     end
@@ -411,20 +307,16 @@ local DoubleTap = (function()
         
         local basicAttack = GetBasicAttackRemote()
         if not basicAttack then
-            print("DoubleTap: BasicAttack remote not found")
             return false
         end
         
-        -- Получаем метатаблицу
         mt = getrawmetatable(basicAttack)
         if not mt then
-            print("DoubleTap: Could not get metatable")
             return false
         end
         
         originalNamecall = mt.__namecall
         
-        -- Временно снимаем защиту
         local wasReadonly = isreadonly and isreadonly(mt)
         if setreadonly then
             setreadonly(mt, false)
@@ -436,11 +328,9 @@ local DoubleTap = (function()
             if self == basicAttack and method == "FireServer" and enabled and isKillerTeam() then
                 local args = {...}
                 
-                -- Первый оригинальный вызов
                 originalNamecall(self, unpack(args))
                 
-                -- Второй вызов для дауна
-                task.wait(0.03) -- Минимальная задержка
+                task.wait(0.03)
                 originalNamecall(self, unpack(args))
                 
                 return
@@ -449,20 +339,17 @@ local DoubleTap = (function()
             return originalNamecall(self, ...)
         end)
         
-        -- Возвращаем защиту если была
         if setreadonly and wasReadonly then
             setreadonly(mt, true)
         end
         
         hooked = true
-        print("DoubleTap: Hook установлен")
         return true
     end
     
     local function removeHook()
         if not hooked or not mt or not originalNamecall then return end
         
-        -- Временно снимаем защиту
         local wasReadonly = isreadonly and isreadonly(mt)
         if setreadonly then
             setreadonly(mt, false)
@@ -470,7 +357,6 @@ local DoubleTap = (function()
         
         mt.__namecall = originalNamecall
         
-        -- Возвращаем защиту если была
         if setreadonly and wasReadonly then
             setreadonly(mt, true)
         end
@@ -478,13 +364,11 @@ local DoubleTap = (function()
         hooked = false
         originalNamecall = nil
         mt = nil
-        print("DoubleTap: Hook удален")
     end
     
     local function updateDoubleTap()
         if enabled and isKillerTeam() then
             if not setupHook() then
-                -- Пробуем найти Remote позже
                 task.spawn(function()
                     task.wait(2)
                     if enabled and isKillerTeam() then
@@ -492,9 +376,7 @@ local DoubleTap = (function()
                     end
                 end)
             end
-            print("DoubleTap: Activated for Killer team")
         elseif enabled then
-            print("DoubleTap: Waiting for Killer team...")
             removeHook()
         else
             removeHook()
@@ -504,61 +386,39 @@ local DoubleTap = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.DoubleTapEnabled = true end
-        print("DoubleTap: ON")
+        Nexus.States.DoubleTapEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateDoubleTap))
         
-        -- Инициализируем состояние
         updateDoubleTap()
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.DoubleTapEnabled = false end
-        print("DoubleTap: OFF")
+        Nexus.States.DoubleTapEnabled = false
         
         removeHook()
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -576,7 +436,7 @@ end)()
 local SpamHook = (function()
     local enabled = false
     local spamCount = 0
-    local maxSpam = 100  -- Изменено на 100 без задержек
+    local maxSpam = 100
     local hooked = false
     local originalNamecall = nil
     local mt = nil
@@ -584,14 +444,11 @@ local SpamHook = (function()
     
     local function GetHookEventRemote()
         local success, result = pcall(function()
-            local remotes = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes")
-            local carry = remotes:WaitForChild("Carry")
-            return carry:WaitForChild("HookEvent")
+            return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Carry"):WaitForChild("HookEvent")
         end)
         return success and result or nil
     end
     
-    -- Найти ближайшего выжившего
     local function findNearestSurvivor()
         local character = Nexus.getCharacter()
         if not character or not character:FindFirstChild("HumanoidRootPart") then
@@ -628,7 +485,6 @@ local SpamHook = (function()
             
             local target = findNearestSurvivor()
             if target and target.Character then
-                -- Вызываем HookEvent без задержек
                 local success = pcall(function()
                     local hookEvent = GetHookEventRemote()
                     if hookEvent then
@@ -648,20 +504,16 @@ local SpamHook = (function()
         
         local hookEvent = GetHookEventRemote()
         if not hookEvent then
-            print("SpamHook: HookEvent remote not found")
             return false
         end
         
-        -- Получаем метатаблицу
         mt = getrawmetatable(hookEvent)
         if not mt then
-            print("SpamHook: Could not get metatable")
             return false
         end
         
         originalNamecall = mt.__namecall
         
-        -- Временно снимаем защиту
         local wasReadonly = isreadonly and isreadonly(mt)
         if setreadonly then
             setreadonly(mt, false)
@@ -673,14 +525,11 @@ local SpamHook = (function()
             if self == hookEvent and method == "FireServer" and enabled and isKillerTeam() and spamCount < maxSpam then
                 local args = {...}
                 
-                -- Оригинальный вызов
                 originalNamecall(self, unpack(args))
                 
                 spamCount = spamCount + 1
                 
-                -- Если нужно спамить несколько раз сразу
                 if enabled and isKillerTeam() and spamCount < maxSpam then
-                    -- Без задержки для быстрого спама
                     originalNamecall(self, unpack(args))
                     spamCount = spamCount + 1
                 end
@@ -691,20 +540,17 @@ local SpamHook = (function()
             return originalNamecall(self, ...)
         end)
         
-        -- Возвращаем защиту если была
         if setreadonly and wasReadonly then
             setreadonly(mt, true)
         end
         
         hooked = true
-        print("SpamHook: Hook установлен")
         return true
     end
     
     local function removeHook()
         if not hooked or not mt or not originalNamecall then return end
         
-        -- Временно снимаем защиту
         local wasReadonly = isreadonly and isreadonly(mt)
         if setreadonly then
             setreadonly(mt, false)
@@ -712,7 +558,6 @@ local SpamHook = (function()
         
         mt.__namecall = originalNamecall
         
-        -- Возвращаем защиту если была
         if setreadonly and wasReadonly then
             setreadonly(mt, true)
         end
@@ -721,12 +566,10 @@ local SpamHook = (function()
         originalNamecall = nil
         mt = nil
         spamCount = 0
-        print("SpamHook: Hook удален")
     end
     
     local function updateSpamHook()
         if enabled and isKillerTeam() then
-            -- Устанавливаем хук
             if not setupHook() then
                 task.spawn(function()
                     task.wait(2)
@@ -736,11 +579,8 @@ local SpamHook = (function()
                 end)
             end
             
-            -- Запускаем спам
             task.spawn(executeHookSpam)
-            print("SpamHook: Activated for Killer team")
         elseif enabled then
-            print("SpamHook: Waiting for Killer team...")
             removeHook()
         else
             removeHook()
@@ -750,62 +590,40 @@ local SpamHook = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.SpamHookEnabled = true end
-        print("SpamHook: ON")
+        Nexus.States.SpamHookEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateSpamHook))
         
-        -- Инициализируем состояние
         updateSpamHook()
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.SpamHookEnabled = false end
-        print("SpamHook: OFF")
+        Nexus.States.SpamHookEnabled = false
         
         spamCount = 0
         removeHook()
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -829,7 +647,6 @@ local DestroyPallets = (function()
     
     local function destroyAllPallets()
         if destroyed then
-            print("DestroyPallets: Pallets already destroyed")
             return
         end
         
@@ -907,23 +724,15 @@ local DestroyPallets = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.DestroyPalletsEnabled = true end
+        Nexus.States.DestroyPalletsEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
@@ -935,7 +744,7 @@ local DestroyPallets = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.DestroyPalletsEnabled = false end
+        Nexus.States.DestroyPalletsEnabled = false
         
         if connection then
             connection:Disconnect()
@@ -952,18 +761,10 @@ local DestroyPallets = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -990,7 +791,6 @@ local NoSlowdown = (function()
         if humanoid then
             originalSpeed = humanoid.WalkSpeed
             speedLocked = false
-            print("NoSlowdown: Saved original speed: " .. tostring(originalSpeed))
         end
     end
     
@@ -998,7 +798,6 @@ local NoSlowdown = (function()
         local humanoid = Nexus.getHumanoid()
         if humanoid and originalSpeed then
             humanoid.WalkSpeed = originalSpeed
-            print("NoSlowdown: Restored original speed: " .. tostring(originalSpeed))
         end
         speedLocked = false
     end
@@ -1010,7 +809,6 @@ local NoSlowdown = (function()
         end
         
         if enabled and isKillerTeam() then
-            -- Сохраняем оригинальную скорость только один раз при включении
             saveOriginalSpeed()
             
             slowdownConnection = Nexus.Services.RunService.Heartbeat:Connect(function()
@@ -1022,52 +820,40 @@ local NoSlowdown = (function()
                 local hum = Nexus.getHumanoid()
                 if not hum then return end
                 
-                -- Если скорость упала ниже 16 (замедление)
                 if hum.WalkSpeed < 16 then
-                    -- Восстанавливаем сохраненную оригинальную скорость
                     if originalSpeed and originalSpeed >= 16 then
                         hum.WalkSpeed = originalSpeed
                     else
-                        hum.WalkSpeed = 16  -- Минимальная нормальная скорость
+                        hum.WalkSpeed = 16
                     end
                     speedLocked = true
                 elseif not speedLocked and hum.WalkSpeed > (originalSpeed or 16) then
-                    -- Если скорость увеличилась (например, от эффектов), обновляем originalSpeed
                     originalSpeed = hum.WalkSpeed
                 end
             end)
             
-            -- Обработчик смены персонажа
             local charAddedConnection
             charAddedConnection = Nexus.Player.CharacterAdded:Connect(function(newChar)
                 if enabled and isKillerTeam() then
-                    -- Отключаем старый коннекшн
                     if slowdownConnection then
                         slowdownConnection:Disconnect()
                         slowdownConnection = nil
                     end
                     
-                    -- Ждем загрузки персонажа
                     task.wait(1)
                     
-                    -- Сохраняем новую оригинальную скорость
                     saveOriginalSpeed()
                     
-                    -- Перезапускаем цикл Heartbeat
                     if enabled and isKillerTeam() then
                         updateNoSlowdown()
                     end
                     
-                    -- Отключаем этот коннекшн, чтобы не копились
                     if charAddedConnection then
                         charAddedConnection:Disconnect()
                     end
                 end
             end)
-            
-            print("NoSlowdown: Activated for Killer team")
         elseif enabled then
-            print("NoSlowdown: Waiting for Killer team...")
             restoreOriginalSpeed()
         else
             restoreOriginalSpeed()
@@ -1077,71 +863,44 @@ local NoSlowdown = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.NoSlowdownEnabled = true end
-        print("NoSlowdown: ON")
+        Nexus.States.NoSlowdownEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateNoSlowdown))
         
-        -- Инициализируем состояние
         updateNoSlowdown()
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.NoSlowdownEnabled = false end
-        print("NoSlowdown: OFF")
+        Nexus.States.NoSlowdownEnabled = false
         
         if slowdownConnection then
-            if Nexus.safeDisconnect then
-                Nexus.safeDisconnect(slowdownConnection)
-            else
-                pcall(function() slowdownConnection:Disconnect() end)
-            end
+            Nexus.safeDisconnect(slowdownConnection)
             slowdownConnection = nil
         end
         
-        -- Восстанавливаем оригинальную скорость
         restoreOriginalSpeed()
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1174,7 +933,6 @@ local Hitbox = (function()
 
     local function UpdateHitboxes()
         if not enabled or not isKillerTeam() then
-            -- Восстанавливаем оригинальные размеры
             for player, originalSize in pairs(originalSizes) do
                 if player and player.Character then
                     local root = player.Character:FindFirstChild("HumanoidRootPart")
@@ -1197,17 +955,14 @@ local Hitbox = (function()
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     
                     if root and hum and hum.Health > 0 then
-                        -- Сохраняем оригинальный размер
                         if not originalSizes[player] then
                             originalSizes[player] = root.Size
                         end
                         
-                        -- Устанавливаем новый размер
                         root.Size = Vector3.new(size, size, size)
                         root.CanCollide = false
                         root.Transparency = 0.7
                     elseif root then
-                        -- Восстанавливаем оригинальный размер
                         if originalSizes[player] then
                             root.Size = originalSizes[player]
                             root.Transparency = 1
@@ -1225,17 +980,13 @@ local Hitbox = (function()
             if not Killer.Connections.Hitbox then
                 Killer.Connections.Hitbox = Nexus.Services.RunService.Heartbeat:Connect(UpdateHitboxes)
             end
-            print("Hitbox: Activated for Killer team")
         elseif enabled then
-            print("Hitbox: Waiting for Killer team...")
-            -- Восстанавливаем оригинальные размеры
             UpdateHitboxes()
             if Killer.Connections.Hitbox then
                 Killer.Connections.Hitbox:Disconnect()
                 Killer.Connections.Hitbox = nil
             end
         else
-            -- Восстанавливаем оригинальные размеры
             UpdateHitboxes()
             if Killer.Connections.Hitbox then
                 Killer.Connections.Hitbox:Disconnect()
@@ -1247,67 +998,44 @@ local Hitbox = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.HitboxEnabled = true end
-        print("Hitbox: ON")
+        Nexus.States.HitboxEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateHitboxState))
         
-        -- Инициализируем состояние
         updateHitboxState()
     end
 
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.HitboxEnabled = false end
-        print("Hitbox: OFF")
+        Nexus.States.HitboxEnabled = false
         
         if Killer.Connections.Hitbox then
             Killer.Connections.Hitbox:Disconnect()
             Killer.Connections.Hitbox = nil
         end
         
-        -- Восстанавливаем оригинальные размеры
         UpdateHitboxes()
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1479,71 +1207,44 @@ local BreakGenerator = (function()
     end
     
     local function updateBreakGenerator()
-        if enabled and isKillerTeam() then
-            print("Break Generator: Activated for Killer team")
-        elseif enabled then
-            print("Break Generator: Waiting for Killer team...")
-        end
     end
     
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.BreakGeneratorEnabled = true end
-        print("Break Generator: ON")
+        Nexus.States.BreakGeneratorEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateBreakGenerator))
         
-        -- Инициализируем состояние
         updateBreakGenerator()
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.BreakGeneratorEnabled = false end
-        print("Break Generator: OFF")
+        Nexus.States.BreakGeneratorEnabled = false
         
         spamInProgress = false
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1602,10 +1303,7 @@ local ThirdPerson = (function()
             if not Killer.Connections.ThirdPerson then
                 Killer.Connections.ThirdPerson = Nexus.Services.RunService.Heartbeat:Connect(UpdateThirdPerson)
             end
-            print("Third Person: Activated for Killer team")
         elseif enabled then
-            print("Third Person: Waiting for Killer team...")
-            -- Гарантированно восстанавливаем камеру
             if Killer.Connections.ThirdPerson then
                 Killer.Connections.ThirdPerson:Disconnect()
                 Killer.Connections.ThirdPerson = nil
@@ -1653,49 +1351,35 @@ local ThirdPerson = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.ThirdPersonEnabled = true end
-        print("Third Person: ON")
+        Nexus.States.ThirdPersonEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateThirdPersonState))
         
-        -- Инициализируем состояние
         updateThirdPersonState()
     end
 
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.ThirdPersonEnabled = false end
-        print("Third Person: OFF")
+        Nexus.States.ThirdPersonEnabled = false
         
         if Killer.Connections.ThirdPerson then
             Killer.Connections.ThirdPerson:Disconnect()
             Killer.Connections.ThirdPerson = nil
         end
         
-        -- Гарантированно восстанавливаем камеру
         task.wait(0.1)
         
         local cam = Nexus.Services.Workspace.CurrentCamera
@@ -1713,22 +1397,13 @@ local ThirdPerson = (function()
         end
         thirdPersonWasActive = false
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1775,10 +1450,8 @@ local BeatGameKiller = (function()
         
         local character = player.Character
         
-        -- Проверка по анимации/состоянию
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
-            -- Проверка анимаций, связанных с хуком
             for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
                 if track.Animation then
                     local animId = track.Animation.AnimationId:lower()
@@ -1789,10 +1462,8 @@ local BeatGameKiller = (function()
             end
         end
         
-        -- Проверка по частям персонажа
         for _, part in ipairs(character:GetDescendants()) do
             if part:IsA("BasePart") then
-                -- Проверка имени или описания
                 local nameLower = part.Name:lower()
                 if nameLower:find("hook") or nameLower:find("trap") then
                     return true
@@ -1800,15 +1471,12 @@ local BeatGameKiller = (function()
             end
         end
         
-        -- Проверка по атрибутам или значениям
         if character:GetAttribute("IsOnHook") or character:GetAttribute("IsTrapped") then
             return true
         end
         
-        -- Проверка по позиции (если игрок долгое время стоит на месте)
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if rootPart then
-            -- Если у игрока есть скрипт или объект Hook или Trap
             for _, obj in ipairs(rootPart:GetChildren()) do
                 if obj.Name:lower():find("hook") or obj.Name:lower():find("trap") then
                     return true
@@ -1835,11 +1503,10 @@ local BeatGameKiller = (function()
             local targetHum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
             
             if targetRoot and targetHum and IsPlayerAlive(targetHum) and IsSurvivor(targetPlayer) then
-                -- Дополнительная проверка: не находится ли игрок на хуке
                 if not IsPlayerOnHook(targetPlayer) then
                     needNewTarget = false
                 else
-                    targetPlayer = nil  -- Сбрасываем цель, если она на хуке
+                    targetPlayer = nil
                 end
             else
                 targetPlayer = nil
@@ -1855,7 +1522,6 @@ local BeatGameKiller = (function()
                     local pHum = player.Character:FindFirstChildOfClass("Humanoid")
                     
                     if pRoot and pHum and IsPlayerAlive(pHum) then
-                        -- Проверяем, не находится ли игрок на хуке
                         if not IsPlayerOnHook(player) then
                             table.insert(survivors, player)
                         end
@@ -1897,7 +1563,6 @@ local BeatGameKiller = (function()
             return
         end
         
-        -- Отключаем коллизию для телепортации
         local char = Nexus.getCharacter()
         if char then
             for _, part in ipairs(char:GetDescendants()) do
@@ -1905,7 +1570,6 @@ local BeatGameKiller = (function()
             end
         end
         
-        -- Телепортируемся к цели
         local targetPos = targetRoot.Position
         local direction = (root.Position - targetPos).Unit
         if direction.Magnitude ~= direction.Magnitude then 
@@ -1915,7 +1579,6 @@ local BeatGameKiller = (function()
         
         root.CFrame = CFrame.new(offsetPos, targetPos)
         
-        -- Атакуем
         pcall(function()
             local remotes = Nexus.Services.ReplicatedStorage:FindFirstChild("Remotes")
             if remotes then
@@ -1935,9 +1598,7 @@ local BeatGameKiller = (function()
             if not Killer.Connections.BeatGame then
                 Killer.Connections.BeatGame = Nexus.Services.RunService.Heartbeat:Connect(UpdateBeatGame)
             end
-            print("Beat Game: Activated for Killer team")
         elseif enabled then
-            print("Beat Game: Waiting for Killer team...")
             if Killer.Connections.BeatGame then
                 Killer.Connections.BeatGame:Disconnect()
                 Killer.Connections.BeatGame = nil
@@ -1955,42 +1616,29 @@ local BeatGameKiller = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.BeatGameKillerEnabled = true end
-        print("Beat Game: ON")
+        Nexus.States.BeatGameKillerEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateBeatGameState))
         
-        -- Инициализируем состояние
         updateBeatGameState()
     end
 
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.BeatGameKillerEnabled = false end
-        print("Beat Game: OFF")
+        Nexus.States.BeatGameKillerEnabled = false
         
         if Killer.Connections.BeatGame then
             Killer.Connections.BeatGame:Disconnect()
@@ -1999,22 +1647,13 @@ local BeatGameKiller = (function()
         
         targetPlayer = nil
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2031,8 +1670,8 @@ end)()
 -- ========== ABYSSWALKER CORRUPT ==========
 
 local AbysswalkerCorrupt = (function()
-    local enabled = false  -- Состояние Toggle
-    local keybindEnabled = false  -- Состояние возможности активации
+    local enabled = false
+    local keybindEnabled = false
     local teamListeners = {}
     local inputConnection = nil
     
@@ -2042,19 +1681,13 @@ local AbysswalkerCorrupt = (function()
     
     local function fireCorruptEvent()
         if not canActivate() then
-            print("Abysswalker Corrupt: Cannot activate (check team/toggle)")
             return
         end
         
         local success = pcall(function()
             local CorruptRemote = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Abysswalker"):WaitForChild("corrupt")
             CorruptRemote:FireServer()
-            print("Abysswalker Corrupt: Activated via Q key")
         end)
-        
-        if not success then
-            print("Abysswalker Corrupt: Failed to activate")
-        end
     end
     
     local function setupKeybind()
@@ -2071,7 +1704,6 @@ local AbysswalkerCorrupt = (function()
                     fireCorruptEvent()
                 end
             end)
-                
         end
     end
     
@@ -2079,9 +1711,7 @@ local AbysswalkerCorrupt = (function()
         if enabled and isKillerTeam() then
             keybindEnabled = true
             setupKeybind()
-            print("Abysswalker Corrupt: Ready for Killer team (Press Q)")
         elseif enabled then
-            print("Abysswalker Corrupt: Waiting for Killer team...")
             keybindEnabled = false
             if inputConnection then
                 inputConnection:Disconnect()
@@ -2099,34 +1729,22 @@ local AbysswalkerCorrupt = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.AbysswalkerCorruptEnabled = true end
-        print("Abysswalker Corrupt: Toggle ON (Press Q to activate)")
+        Nexus.States.AbysswalkerCorruptEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateAbysswalkerState))
         
-        -- Инициализируем состояние
         updateAbysswalkerState()
     end
     
@@ -2134,30 +1752,20 @@ local AbysswalkerCorrupt = (function()
         if not enabled then return end
         enabled = false
         keybindEnabled = false
-        if Nexus.States then Nexus.States.AbysswalkerCorruptEnabled = false end
-        print("Abysswalker Corrupt: Toggle OFF")
+        Nexus.States.AbysswalkerCorruptEnabled = false
         
         if inputConnection then
             inputConnection:Disconnect()
             inputConnection = nil
         end
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2166,8 +1774,6 @@ local AbysswalkerCorrupt = (function()
     local function ForceActivate()
         if enabled and isKillerTeam() then
             fireCorruptEvent()
-        else
-            print("Abysswalker Corrupt: Cannot force activate (toggle off or wrong team)")
         end
     end
     
@@ -2176,7 +1782,7 @@ local AbysswalkerCorrupt = (function()
         Disable = Disable,
         IsEnabled = function() return enabled end,
         IsKeybindReady = function() return keybindEnabled end,
-        Activate = ForceActivate  -- Оставляем для ручной активации если нужно
+        Activate = ForceActivate
     }
 end)()
 
@@ -2239,7 +1845,6 @@ local AntiBlind = (function()
         
         remote.FireServer = function(self, ...)
             if isAntiBlindEnabled and isKillerTeam() then
-                print("AntiBlind blocked: " .. self.Name)
                 return nil
             end
             return originalFireServer(self, ...)
@@ -2248,7 +1853,6 @@ local AntiBlind = (function()
         if remote:IsA("RemoteEvent") then
             remote.OnClientEvent = function(self, ...)
                 if isAntiBlindEnabled and isKillerTeam() then
-                    print("AntiBlind blocked: " .. self.Name)
                     return nil
                 end
                 return originalOnClientEvent(self, ...)
@@ -2256,7 +1860,6 @@ local AntiBlind = (function()
         end
         
         hookedRemotes[remote] = true
-        print("AntiBlind hooked: " .. remote:GetFullName())
     end
 
     local function setupAntiBlind()
@@ -2289,7 +1892,6 @@ local AntiBlind = (function()
                 if isAntiBlindEnabled and isKillerTeam() and method == "FireServer" then
                     local remoteName = tostring(self)
                     if remoteName:lower():find("blind") or remoteName:lower():find("flash") then
-                        print("AntiBlind blocked via metatable: " .. remoteName)
                         return nil
                     end
                 end
@@ -2321,7 +1923,7 @@ local AntiBlind = (function()
     local function updateAntiBlind()
         if enabled and isKillerTeam() then
             isAntiBlindEnabled = true
-            if Nexus.States then Nexus.States.KillerAntiBlindEnabled = true end
+            Nexus.States.KillerAntiBlindEnabled = true
             
             setupAntiBlind()
             setupMetaTableHook()
@@ -2334,16 +1936,13 @@ local AntiBlind = (function()
                     end
                 end
             end)
-            
-            print("AntiBlind: Activated for Killer team")
         elseif enabled then
-            print("AntiBlind: Waiting for Killer team...")
             isAntiBlindEnabled = false
-            if Nexus.States then Nexus.States.KillerAntiBlindEnabled = false end
+            Nexus.States.KillerAntiBlindEnabled = false
             restoreHooks()
         else
             isAntiBlindEnabled = false
-            if Nexus.States then Nexus.States.KillerAntiBlindEnabled = false end
+            Nexus.States.KillerAntiBlindEnabled = false
             restoreHooks()
         end
     end
@@ -2351,62 +1950,40 @@ local AntiBlind = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        print("AntiBlind: ON")
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateAntiBlind))
         
-        -- Инициализируем состояние
         updateAntiBlind()
     end
 
     local function Disable()
         if not enabled then return end
         enabled = false
-        print("AntiBlind: OFF")
         
         isAntiBlindEnabled = false
-        if Nexus.States then Nexus.States.KillerAntiBlindEnabled = false end
+        Nexus.States.KillerAntiBlindEnabled = false
         
         restoreHooks()
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2449,11 +2026,9 @@ local NoPalletStun = (function()
         
         local stunRemote, stunOverRemote = getRemotes()
         if not stunRemote or not stunOverRemote then
-            print("NoPalletStun: Could not find remotes")
             return false
         end
         
-        -- Блокируем через метатаблицу
         local mt = getrawmetatable(stunRemote)
         if not mt then return false end
         
@@ -2468,7 +2043,6 @@ local NoPalletStun = (function()
             local method = getnamecallmethod()
             
             if self == stunRemote and method == "FireServer" and enabled and isKillerTeam() then
-                -- Блокируем оглушение и сразу отправляем завершение
                 if stunOverRemote then
                     stunOverRemote:FireServer()
                 end
@@ -2482,7 +2056,6 @@ local NoPalletStun = (function()
             setreadonly(mt, true)
         end
         
-        -- Также блокируем OnClientEvent для клиентских вызовов
         local originalOnClientEvent = stunRemote.OnClientEvent
         stunRemote.OnClientEvent = function(...)
             if enabled and isKillerTeam() then
@@ -2495,29 +2068,15 @@ local NoPalletStun = (function()
         end
         
         hooked = true
-        print("NoPalletStun: Hook установлен")
         return true
     end
     
     local function removeHook()
         if not hooked then return end
         
-        -- Восстанавливаем оригинальный функционал
-        local stunRemote = getRemotes()
-        if stunRemote then
-            local mt = getrawmetatable(stunRemote)
-            if mt and mt.__namecall then
-                local wasReadonly = isreadonly and isreadonly(mt)
-                if setreadonly then
-                    setreadonly(mt, false)
-                end
-            end
-        end
-        
         hooked = false
         originalNamecall = nil
         mt = nil
-        print("NoPalletStun: Hook удален")
     end
     
     local function updateNoPalletStun()
@@ -2532,9 +2091,7 @@ local NoPalletStun = (function()
                     end
                 end)
             end
-            print("NoPalletStun: Activated for Killer team")
         elseif enabled then
-            print("NoPalletStun: Waiting for Killer team...")
             removeHook()
         else
             removeHook()
@@ -2544,61 +2101,39 @@ local NoPalletStun = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        if Nexus.States then Nexus.States.NoPalletStunEnabled = true end
-        print("NoPalletStun: ON")
+        Nexus.States.NoPalletStunEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateNoPalletStun))
         
-        -- Инициализируем состояние
         updateNoPalletStun()
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        if Nexus.States then Nexus.States.NoPalletStunEnabled = false end
-        print("NoPalletStun: OFF")
+        Nexus.States.NoPalletStunEnabled = false
         
         removeHook()
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    if Nexus.safeDisconnect then
-                        Nexus.safeDisconnect(conn)
-                    else
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    Nexus.safeDisconnect(conn)
                 end
             else
-                if Nexus.safeDisconnect then
-                    Nexus.safeDisconnect(listener)
-                else
-                    pcall(function() listener:Disconnect() end)
-                end
+                Nexus.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2616,7 +2151,6 @@ end)()
 local function activateMaskPower(maskName)
     local success, result = pcall(function()
         if not isKillerTeam() then
-            print("Mask Powers: Requires Killer team")
             return false
         end
         
@@ -2626,14 +2160,13 @@ local function activateMaskPower(maskName)
         local activatePower = masked:WaitForChild("Activatepower")
         
         activatePower:FireServer(maskName)
-        print("Mask Power activated: " .. maskName)
         return true
     end)
     
     return success and result
 end
 
--- ========== ИНИЦИАЛИЗАЦИЯ ==========
+-- ========== MODULE INITIALIZATION ==========
 
 function Killer.Init(nxs)
     Nexus = nxs
@@ -2641,12 +2174,6 @@ function Killer.Init(nxs)
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
     
-    -- Сначала создаем секцию
-    if Tabs and Tabs.Killer then
-        Tabs.Killer:AddSection("Killer", "snowflake")
-    end
-    
-    -- ========== SPEAR CROSSHAIR ==========
     local SpearCrosshairToggle = Tabs.Killer:AddToggle("SpearCrosshair", {
         Title = "Spear Crosshair (Veil)", 
         Description = "Показывает прицел в режиме копья Veil", 
@@ -2654,34 +2181,22 @@ function Killer.Init(nxs)
     })
 
     SpearCrosshairToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    SpearCrosshair.Enable() 
-                else 
-                    SpearCrosshair.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    SpearCrosshair.Enable() 
-                else 
-                    SpearCrosshair.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                SpearCrosshair.Enable() 
+            else 
+                SpearCrosshair.Disable() 
+            end
+        end)
     end)
 
--- ========== DESTROY PALLETS ==========
-local DestroyPalletsToggle = Tabs.Killer:AddToggle("DestroyPallets", {
-    Title = "Destroy Pallets [He also works for the survivor]", 
-    Description = "Smash all the pallets on the map", 
-    Default = false
-})
+    local DestroyPalletsToggle = Tabs.Killer:AddToggle("DestroyPallets", {
+        Title = "Destroy Pallets [He also works for the survivor]", 
+        Description = "Smash all the pallets on the map", 
+        Default = false
+    })
 
-DestroyPalletsToggle:OnChanged(function(v)
-    if Nexus.SafeCallback then
+    DestroyPalletsToggle:OnChanged(function(v)
         Nexus.SafeCallback(function()
             if v then 
                 DestroyPallets.Enable() 
@@ -2689,19 +2204,8 @@ DestroyPalletsToggle:OnChanged(function(v)
                 DestroyPallets.Disable() 
             end
         end)
-    else
-        pcall(function()
-            if v then 
-                DestroyPallets.Enable() 
-            else 
-                DestroyPallets.Disable() 
-            end
-        end)
-    end
-end)
+    end)
 
-
-    -- ========== NO SLOWDOWN ==========
     local NoSlowdownToggle = Tabs.Killer:AddToggle("NoSlowdown", {
         Title = "No Slowdown", 
         Description = "Prevents slowdown when attacking", 
@@ -2709,26 +2213,15 @@ end)
     })
 
     NoSlowdownToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    NoSlowdown.Enable() 
-                else 
-                    NoSlowdown.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    NoSlowdown.Enable() 
-                else 
-                    NoSlowdown.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                NoSlowdown.Enable() 
+            else 
+                NoSlowdown.Disable() 
+            end
+        end)
     end)
 
-    -- ========== HITBOX EXPAND ==========
     local HitboxToggle = Tabs.Killer:AddToggle("Hitbox", {
         Title = "Hitbox Expand", 
         Description = "Expand survivor hitboxes for easier hits", 
@@ -2736,22 +2229,13 @@ end)
     })
 
     HitboxToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    Hitbox.Enable() 
-                else 
-                    Hitbox.Disable() 
-            end)
-        else
-            pcall(function()
-                if v then 
-                    Hitbox.Enable() 
-                else 
-                    Hitbox.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                Hitbox.Enable() 
+            else 
+                Hitbox.Disable() 
+            end
+        end)
     end)
 
     local HitboxSlider = Tabs.Killer:AddSlider("HitboxSize", {
@@ -2762,19 +2246,12 @@ end)
         Max = 500,
         Rounding = 1,
         Callback = function(value)
-            if Nexus.SafeCallback then
-                Nexus.SafeCallback(function()
-                    Hitbox.SetSize(value)
-                end)
-            else
-                pcall(function()
-                    Hitbox.SetSize(value)
-                end)
-            end
+            Nexus.SafeCallback(function()
+                Hitbox.SetSize(value)
+            end)
         end
     })
 
-    -- ========== BREAK GENERATOR ==========
     local BreakGeneratorToggle = Tabs.Killer:AddToggle("BreakGenerator", {
         Title = "FullGeneratorBreak", 
         Description = "Complete generator failure", 
@@ -2782,26 +2259,15 @@ end)
     })
 
     BreakGeneratorToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    BreakGenerator.Enable() 
-                else 
-                    BreakGenerator.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    BreakGenerator.Enable() 
-                else 
-                    BreakGenerator.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                BreakGenerator.Enable() 
+            else 
+                BreakGenerator.Disable() 
+            end
+        end)
     end)
 
-    -- ========== THIRD PERSON ==========
     local ThirdPersonToggle = Tabs.Killer:AddToggle("ThirdPerson", {
         Title = "Third Person", 
         Description = "Toggle third person view (Killer only)", 
@@ -2809,26 +2275,15 @@ end)
     })
 
     ThirdPersonToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    ThirdPerson.Enable() 
-                else 
-                    ThirdPerson.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    ThirdPerson.Enable() 
-                else 
-                    ThirdPerson.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                ThirdPerson.Enable() 
+            else 
+                ThirdPerson.Disable() 
+            end
+        end)
     end)
 
-    -- ========== NO PALLET STUN ==========
     local NoPalletStunToggle = Tabs.Killer:AddToggle("NoPalletStun", {
         Title = "No Pallet Stun", 
         Description = "Protection against pallet stunning", 
@@ -2836,26 +2291,15 @@ end)
     })
 
     NoPalletStunToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    NoPalletStun.Enable() 
-                else 
-                    NoPalletStun.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    NoPalletStun.Enable() 
-                else 
-                    NoPalletStun.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                NoPalletStun.Enable() 
+            else 
+                NoPalletStun.Disable() 
+            end
+        end)
     end)
 
-    -- ========== DOUBLE TAP ==========
     local DoubleTapToggle = Tabs.Killer:AddToggle("DoubleTap", {
         Title = "Double Tap", 
         Description = "Атакует дважды при одной атаке", 
@@ -2863,26 +2307,15 @@ end)
     })
 
     DoubleTapToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    DoubleTap.Enable() 
-                else 
-                    DoubleTap.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    DoubleTap.Enable() 
-                else 
-                    DoubleTap.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                DoubleTap.Enable() 
+            else 
+                DoubleTap.Disable() 
+            end
+        end)
     end)
 
-    -- ========== SPAM HOOK ==========
     local SpamHookToggle = Tabs.Killer:AddToggle("SpamHook", {
         Title = "Spam Hook", 
         Description = "You can kill a survivor with one hook hit (and still farm the reward)", 
@@ -2890,26 +2323,15 @@ end)
     })
 
     SpamHookToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    SpamHook.Enable() 
-                else 
-                    SpamHook.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    SpamHook.Enable() 
-                else 
-                    SpamHook.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                SpamHook.Enable() 
+            else 
+                SpamHook.Disable() 
+            end
+        end)
     end)
     
-    -- ========== BEAT GAME (KILLER) ==========
     local BeatGameToggle = Tabs.Killer:AddToggle("BeatGame", {
         Title = "Beat Game (Killer)", 
         Description = "Automatically hunt and kill all survivors", 
@@ -2917,26 +2339,15 @@ end)
     })
 
     BeatGameToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    BeatGameKiller.Enable() 
-                else 
-                    BeatGameKiller.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    BeatGameKiller.Enable() 
-                else 
-                    BeatGameKiller.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                BeatGameKiller.Enable() 
+            else 
+                BeatGameKiller.Disable() 
+            end
+        end)
     end)
 
-        -- ========== USE FAKE SAW ==========
     local UseFakeSawToggle = Tabs.Killer:AddToggle("UseFakeSaw", {
         Title = "Use Fake Saw", 
         Description = "Continuously activates Alex's chainsaw attack (kills from 1 time)", 
@@ -2944,26 +2355,14 @@ end)
     })
 
     UseFakeSawToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    UseFakeSaw.Enable() 
-                else 
-                    UseFakeSaw.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    UseFakeSaw.Enable() 
-                else 
-                    UseFakeSaw.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                UseFakeSaw.Enable() 
+            else 
+                UseFakeSaw.Disable() 
+            end
+        end)
     end)
-
-    -- ========== ABYSSWALKER CORRUPT ==========
     
     local AbysswalkerCorruptToggle = Tabs.Killer:AddToggle("AbysswalkerCorrupt", {
         Title = "Abysswalker Corrupt [NO CD]",
@@ -2972,26 +2371,15 @@ end)
     })
 
     AbysswalkerCorruptToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    AbysswalkerCorrupt.Enable() 
-                else 
-                    AbysswalkerCorrupt.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    AbysswalkerCorrupt.Enable() 
-                else 
-                    AbysswalkerCorrupt.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                AbysswalkerCorrupt.Enable() 
+            else 
+                AbysswalkerCorrupt.Disable() 
+            end
+        end)
     end)
 
-    -- ========== ANTI BLIND ==========
     local AntiBlindToggle = Tabs.Killer:AddToggle("AntiBlind", {
         Title = "Anti Blind", 
         Description = "prevents you from being blinded by a flashlight", 
@@ -2999,26 +2387,15 @@ end)
     })
 
     AntiBlindToggle:OnChanged(function(v)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if v then 
-                    AntiBlind.Enable() 
-                else 
-                    AntiBlind.Disable() 
-                end
-            end)
-        else
-            pcall(function()
-                if v then 
-                    AntiBlind.Enable() 
-                else 
-                    AntiBlind.Disable() 
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if v then 
+                AntiBlind.Enable() 
+            else 
+                AntiBlind.Disable() 
+            end
+        end)
     end)
 
-    -- ========== MASK POWERS ==========
     local MaskPowers = Tabs.Killer:AddDropdown("MaskPowers", {
         Title = "Mask Powers",
         Description = "Select mask power to activate immediately",
@@ -3028,36 +2405,25 @@ end)
     })
 
     MaskPowers:OnChanged(function(value)
-        if Nexus.SafeCallback then
-            Nexus.SafeCallback(function()
-                if value and value ~= "" then
-                    activateMaskPower(value)
-                end
-            end)
-        else
-            pcall(function()
-                if value and value ~= "" then
-                    activateMaskPower(value)
-                end
-            end)
-        end
+        Nexus.SafeCallback(function()
+            if value and value ~= "" then
+                activateMaskPower(value)
+            end
+        end)
     end)
 
-    -- ========== INFORMATION ==========
     Tabs.Killer:AddParagraph({
         Title = "Mask Powers Information",
         Content = "Alex - Chainsaw\nTony - Fists\nBrandon - Speed\nJake - Long lunge\nRichter - Stealth\nGraham - Faster vaults\nRichard - Default mask"
     })
 
-    -- ========== ОБРАБОТКА ВВОДА ДЛЯ BREAK GENERATOR ==========
     Nexus.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if not gameProcessed and input.KeyCode == Enum.KeyCode.Space then
-            if Nexus.States and Nexus.States.BreakGeneratorEnabled then
+            if Nexus.States.BreakGeneratorEnabled then
                 BreakGenerator.SpamGeneratorBreak()
             end
         end
     end)
-    
 end
 
 -- ========== CLEANUP ==========
@@ -3077,17 +2443,11 @@ function Killer.Cleanup()
     UseFakeSaw.Disable() 
     AntiBlind.Disable()
     
-    -- Очищаем все соединения
     for key, connection in pairs(Killer.Connections) do
-        if Nexus.safeDisconnect then
-            Nexus.safeDisconnect(connection)
-        else
-            pcall(function() connection:Disconnect() end)
-        end
+        Nexus.safeDisconnect(connection)
     end
     Killer.Connections = {}
     
-    -- Очищаем кэш хитбоксов
     Killer.HitboxCache = {}
 end
 
