@@ -438,87 +438,49 @@ function Visual.ToggleAdvancedESP(enabled)
     end
 end
 
-function Visual.ClearAdvancedESP(plr)
+function Visual.HideAdvancedESP(plr)
     local d = Visual.AdvancedESP.espObjects[plr]
     if d then
-        -- Скрываем все объекты
+        -- Скрываем все Drawing объекты
         local drawingObjects = {
             d.BoxFill, d.Name, d.Distance, d.Tracer, d.HealthBg, 
             d.HealthBar, d.HealthMask, d.HealthText, d.Box, d.BoxOutline
         }
         
         for _, obj in ipairs(drawingObjects) do
-            if obj and typeof(obj) == "userdata" then
-                pcall(function() obj.Visible = false end)
+            if obj then
+                pcall(function() 
+                    obj.Visible = false 
+                end)
             end
         end
         
         -- Скрываем health stripes
-        for i=1,24 do
+        for i = 1, 24 do
             if d["HealthStripe"..i] then
-                pcall(function() d["HealthStripe"..i].Visible = false end)
+                pcall(function() 
+                    d["HealthStripe"..i].Visible = false 
+                end)
             end
         end
         
         -- Скрываем кости
         if d.Bones then
             for _, bone in ipairs(d.Bones) do
-                if bone and typeof(bone) == "userdata" then
-                    pcall(function() bone.Visible = false end)
+                if bone then
+                    pcall(function() 
+                        bone.Visible = false 
+                    end)
                 end
             end
         end
-        
-        Visual.AdvancedESP.espObjects[plr] = nil
-    end
-    
-    -- Удаляем соединения для этого игрока
-    if Visual.AdvancedESP.playerConnections[plr] then
-        for _, connection in pairs(Visual.AdvancedESP.playerConnections[plr]) do
-            pcall(function() connection:Disconnect() end)
-        end
-        Visual.AdvancedESP.playerConnections[plr] = nil
-    end
-end
-
-function Visual.DestroyAdvancedESP(plr)
-    local d = Visual.AdvancedESP.espObjects[plr]
-    if d then
-        -- Удаляем все Drawing объекты
-        local drawingObjects = {
-            d.BoxFill, d.Name, d.Distance, d.Tracer, d.HealthBg, 
-            d.HealthBar, d.HealthMask, d.HealthText, d.Box, d.BoxOutline
-        }
-        
-        for _, obj in ipairs(drawingObjects) do
-            if obj and typeof(obj) == "userdata" then
-                pcall(function() obj:Remove() end)
-            end
-        end
-        
-        -- Удаляем health stripes
-        for i=1,24 do
-            if d["HealthStripe"..i] then
-                pcall(function() d["HealthStripe"..i]:Remove() end)
-            end
-        end
-        
-        -- Удаляем кости
-        if d.Bones then
-            for _, bone in ipairs(d.Bones) do
-                if bone and typeof(bone) == "userdata" then
-                    pcall(function() bone:Remove() end)
-                end
-            end
-        end
-        
-        Visual.AdvancedESP.espObjects[plr] = nil
     end
 end
 
 function Visual.CreateAdvancedESP(plr)
     if Visual.AdvancedESP.espObjects[plr] then
-        Visual.DestroyAdvancedESP(plr)
+        Visual.HideAdvancedESP(plr)
+        return Visual.AdvancedESP.espObjects[plr]
     end
     
     local settings = Visual.AdvancedESP.settings
@@ -619,12 +581,20 @@ function Visual.CreateAdvancedESP(plr)
         Filled = false
     })
     
-    for i=1,14 do
+    for i = 1, 14 do
         d.Bones[i] = create("Line", {
             Thickness = 1.5,
             Color = boneColor,
             Visible = false
         })
+    end
+    
+    -- Инициализируем health stripes
+    for i = 1, 24 do
+        d["HealthStripe"..i] = Drawing.new("Square")
+        d["HealthStripe"..i].Visible = false
+        d["HealthStripe"..i].Filled = true
+        d["HealthStripe"..i].Transparency = 1
     end
     
     Visual.AdvancedESP.espObjects[plr] = d
@@ -639,26 +609,50 @@ end
 function Visual.SetupPlayerAdvancedESP(plr)
     if plr == Nexus.Player then return end
     
+    -- Создаем ESP объекты для игрока
     Visual.CreateAdvancedESP(plr)
     
+    -- Отслеживаем смену персонажа
     local function handleCharacterChanged()
-        Visual.DestroyAdvancedESP(plr)
-        Visual.CreateAdvancedESP(plr)
+        -- При смене персонажа просто скрываем ESP
+        Visual.HideAdvancedESP(plr)
     end
     
     local charAddedConnection = plr.CharacterAdded:Connect(handleCharacterChanged)
+    
     local charRemovingConnection = plr.CharacterRemoving:Connect(function()
-        Visual.DestroyAdvancedESP(plr)
+        -- При удалении персонажа скрываем ESP
+        Visual.HideAdvancedESP(plr)
     end)
     
-    if Visual.AdvancedESP.playerConnections[plr] then
-        Visual.AdvancedESP.playerConnections[plr].charAdded = charAddedConnection
-        Visual.AdvancedESP.playerConnections[plr].charRemoving = charRemovingConnection
+    -- Отслеживаем выход игрока
+    local ancestryChangedConnection = plr.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            Visual.HideAdvancedESP(plr)
+            if Visual.AdvancedESP.playerConnections[plr] then
+                for _, conn in pairs(Visual.AdvancedESP.playerConnections[plr]) do
+                    pcall(function() conn:Disconnect() end)
+                end
+                Visual.AdvancedESP.playerConnections[plr] = nil
+            end
+        end
+    end)
+    
+    Visual.AdvancedESP.playerConnections[plr] = {
+        charAdded = charAddedConnection,
+        charRemoving = charRemovingConnection,
+        ancestryChanged = ancestryChangedConnection
+    }
+    
+    -- Если у игрока уже есть персонаж, сразу создаем ESP
+    if plr.Character then
+        task.spawn(function()
+            wait(0.5)
+            if not Visual.AdvancedESP.espObjects[plr] then
+                Visual.CreateAdvancedESP(plr)
+            end
+        end)
     end
-end
-
-function Visual.CleanupPlayerAdvancedESP(plr)
-    Visual.DestroyAdvancedESP(plr)
 end
 
 function Visual.GetHealthGradientColor(y, h)
@@ -693,7 +687,7 @@ function Visual.UpdateAdvancedESP()
     
     for plr, d in pairs(Visual.AdvancedESP.espObjects) do
         if not plr or not plr.Parent then
-            Visual.DestroyAdvancedESP(plr)
+            Visual.HideAdvancedESP(plr)
             continue
         end
         
@@ -702,19 +696,8 @@ function Visual.UpdateAdvancedESP()
             local hum = char:FindFirstChildOfClass("Humanoid")
             
             if hum and hum.Health <= 0 then
-                -- Скрываем все объекты если игрок мертв
-                if d.BoxFill then d.BoxFill.Visible = false end
-                if d.Box then d.Box.Visible = false end
-                if d.BoxOutline then d.BoxOutline.Visible = false end
-                if d.Name then d.Name.Visible = false end
-                if d.Distance then d.Distance.Visible = false end
-                if d.HealthBg then d.HealthBg.Visible = false end
-                if d.HealthText then d.HealthText.Visible = false end
-                for i=1,24 do
-                    if d["HealthStripe"..i] then d["HealthStripe"..i].Visible = false end
-                end
-                if d.Bones then for _,line in ipairs(d.Bones) do line.Visible = false end end
-                if d.Tracer then d.Tracer.Visible = false end
+                -- Скрываем ESP если игрок мертв
+                Visual.HideAdvancedESP(plr)
                 continue
             end
             
@@ -748,7 +731,7 @@ function Visual.UpdateAdvancedESP()
                     d.BoxFill.Color = Visual.AdvancedESP.colorMap[settings.boxFillColorName] or Visual.AdvancedESP.colorMap.White
                     d.BoxFill.Filled = true
                     d.BoxFill.Transparency = 1 - (settings.boxFillTransparency or 0.9)
-                    d.BoxFill.Visible = settings.boxFill
+                    d.BoxFill.Visible = settings.boxFill and settings.enabled
                 end
 
                 -- Box
@@ -757,7 +740,7 @@ function Visual.UpdateAdvancedESP()
                     d.Box.Size = Vector2.new(width, height)
                     d.Box.Color = Visual.AdvancedESP.colorMap[settings.boxColorName] or Visual.AdvancedESP.colorMap.White
                     d.Box.Thickness = 1.7
-                    d.Box.Visible = settings.box
+                    d.Box.Visible = settings.box and settings.enabled
                 end
                 
                 -- Box Outline
@@ -767,7 +750,7 @@ function Visual.UpdateAdvancedESP()
                     d.BoxOutline.Size = Vector2.new(width + thickness * 2, height + thickness * 2)
                     d.BoxOutline.Color = Visual.AdvancedESP.colorMap[settings.boxOutlineColorName] or Visual.AdvancedESP.colorMap.Black
                     d.BoxOutline.Thickness = thickness
-                    d.BoxOutline.Visible = settings.box and settings.boxOutline
+                    d.BoxOutline.Visible = settings.box and settings.boxOutline and settings.enabled
                 end
 
                 -- Name
@@ -775,7 +758,7 @@ function Visual.UpdateAdvancedESP()
                     d.Name.Text = plr.Name
                     d.Name.Size = 20
                     d.Name.Position = Vector2.new(headPos.X, y - 22)
-                    d.Name.Visible = settings.name
+                    d.Name.Visible = settings.name and settings.enabled
                 end
 
                 -- Distance
@@ -784,7 +767,7 @@ function Visual.UpdateAdvancedESP()
                     d.Distance.Text = dist .. "m"
                     d.Distance.Size = 16
                     d.Distance.Position = Vector2.new(headPos.X, y + height + 6)
-                    d.Distance.Visible = settings.distance
+                    d.Distance.Visible = settings.distance and settings.enabled
                 end
 
                 -- Health Bar
@@ -796,25 +779,24 @@ function Visual.UpdateAdvancedESP()
                     
                     d.HealthBg.Position = Vector2.new(barX, barY)
                     d.HealthBg.Size = Vector2.new(barWidth, barHeight)
-                    d.HealthBg.Visible = settings.healthbar
+                    d.HealthBg.Visible = settings.healthbar and settings.enabled
                     
-                    if settings.healthbar then
+                    if settings.healthbar and settings.enabled then
                         local HEALTH_STRIPES = 24
                         local hpPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                        
                         for i = 1, HEALTH_STRIPES do
-                            local stripeY = barY + barHeight * (i - 1) / HEALTH_STRIPES
-                            local stripeH = barHeight / HEALTH_STRIPES
-                            local stripeColor = Visual.GetHealthGradientColor(stripeY - barY, barHeight)
-                            if not d["HealthStripe"..i] then
-                                d["HealthStripe"..i] = Drawing.new("Square")
-                                d["HealthStripe"..i].Filled = true
-                            end
                             local stripe = d["HealthStripe"..i]
-                            stripe.Color = stripeColor
-                            stripe.Position = Vector2.new(barX, stripeY)
-                            stripe.Size = Vector2.new(barWidth, stripeH)
-                            stripe.Visible = (i - 1) / HEALTH_STRIPES < hpPerc
-                            stripe.Transparency = 1
+                            if stripe then
+                                local stripeY = barY + barHeight * (i - 1) / HEALTH_STRIPES
+                                local stripeH = barHeight / HEALTH_STRIPES
+                                local stripeColor = Visual.GetHealthGradientColor(stripeY - barY, barHeight)
+                                
+                                stripe.Color = stripeColor
+                                stripe.Position = Vector2.new(barX, stripeY)
+                                stripe.Size = Vector2.new(barWidth, stripeH)
+                                stripe.Visible = (i - 1) / HEALTH_STRIPES < hpPerc
+                            end
                         end
                         
                         d.HealthText.Text = tostring(math.floor(hum.Health))
@@ -833,7 +815,7 @@ function Visual.UpdateAdvancedESP()
 
                 -- Bones
                 if d.Bones then
-                    local bonesVisible = settings.bones
+                    local bonesVisible = settings.bones and settings.enabled
                     local bones
                     
                     if Visual.IsR6(char) then
@@ -867,7 +849,7 @@ function Visual.UpdateAdvancedESP()
                     
                     for i = 1, 14 do
                         local line = d.Bones[i]
-                        if bones[i] and bones[i][1] and bones[i][2] then
+                        if line and bones[i] and bones[i][1] and bones[i][2] then
                             local p1 = screenPosOrNil(bones[i][1])
                             local p2 = screenPosOrNil(bones[i][2])
                             if p1 and p2 then
@@ -878,7 +860,7 @@ function Visual.UpdateAdvancedESP()
                             else
                                 line.Visible = false
                             end
-                        else
+                        elseif line then
                             line.Visible = false
                         end
                     end
@@ -890,42 +872,26 @@ function Visual.UpdateAdvancedESP()
                     d.Tracer.From = screenCenter
                     d.Tracer.To = rootPos2D
                     d.Tracer.Color = Visual.AdvancedESP.colorMap[settings.tracerColorName] or Visual.AdvancedESP.colorMap.White
-                    d.Tracer.Visible = settings.tracers
+                    d.Tracer.Visible = settings.tracers and settings.enabled
                 end
             else
                 -- Скрываем все если не на экране
-                if d.BoxFill then d.BoxFill.Visible = false end
-                if d.Box then d.Box.Visible = false end
-                if d.BoxOutline then d.BoxOutline.Visible = false end
-                if d.Name then d.Name.Visible = false end
-                if d.Distance then d.Distance.Visible = false end
-                if d.HealthBg then d.HealthBg.Visible = false end
-                if d.HealthText then d.HealthText.Visible = false end
-                for i = 1, 24 do
-                    if d["HealthStripe"..i] then d["HealthStripe"..i].Visible = false end
-                end
-                if d.Bones then for _, line in ipairs(d.Bones) do line.Visible = false end end
-                if d.Tracer then d.Tracer.Visible = false end
+                Visual.HideAdvancedESP(plr)
             end
         else
-            Visual.DestroyAdvancedESP(plr)
+            Visual.HideAdvancedESP(plr)
         end
     end
 end
 
 function Visual.StartAdvancedESP()
-    -- Удаляем предыдущие ESP объекты
-    for plr, _ in pairs(Visual.AdvancedESP.espObjects) do
-        Visual.DestroyAdvancedESP(plr)
-    end
-    Visual.AdvancedESP.espObjects = {}
-    
-    -- Отключаем предыдущие соединения
+    -- Отключаем предыдущее соединение RenderStepped
     if Visual.AdvancedESP.connections.renderStepped then
         Visual.AdvancedESP.connections.renderStepped:Disconnect()
+        Visual.AdvancedESP.connections.renderStepped = nil
     end
     
-    -- Setup player connections
+    -- Настраиваем соединения для игроков
     Visual.AdvancedESP.connections.playerAdded = Nexus.Services.Players.PlayerAdded:Connect(function(plr)
         if plr ~= Nexus.Player then
             Visual.SetupPlayerAdvancedESP(plr)
@@ -933,17 +899,23 @@ function Visual.StartAdvancedESP()
     end)
     
     Visual.AdvancedESP.connections.playerRemoving = Nexus.Services.Players.PlayerRemoving:Connect(function(plr)
-        Visual.DestroyAdvancedESP(plr)
+        Visual.HideAdvancedESP(plr)
+        if Visual.AdvancedESP.playerConnections[plr] then
+            for _, conn in pairs(Visual.AdvancedESP.playerConnections[plr]) do
+                pcall(function() conn:Disconnect() end)
+            end
+            Visual.AdvancedESP.playerConnections[plr] = nil
+        end
     end)
     
-    -- Setup existing players
+    -- Настраиваем существующих игроков
     for _, plr in pairs(Nexus.Services.Players:GetPlayers()) do
         if plr ~= Nexus.Player then
             Visual.SetupPlayerAdvancedESP(plr)
         end
     end
     
-    -- Start update loop
+    -- Запускаем цикл обновления
     Visual.AdvancedESP.connections.renderStepped = Nexus.Services.RunService.RenderStepped:Connect(function()
         Visual.UpdateAdvancedESP()
     end)
@@ -956,12 +928,17 @@ function Visual.StopAdvancedESP()
     end
     Visual.AdvancedESP.connections = {}
     
-    -- Удаляем все ESP объекты
+    -- Скрываем все ESP объекты
     for plr, _ in pairs(Visual.AdvancedESP.espObjects) do
-        Visual.DestroyAdvancedESP(plr)
+        Visual.HideAdvancedESP(plr)
     end
     
-    Visual.AdvancedESP.espObjects = {}
+    -- Отключаем соединения игроков
+    for plr, connections in pairs(Visual.AdvancedESP.playerConnections) do
+        for _, conn in pairs(connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+    end
     Visual.AdvancedESP.playerConnections = {}
 end
 
