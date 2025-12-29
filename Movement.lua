@@ -788,8 +788,8 @@ local FreeCamera = (function()
         IsEnabled = function() return enabled end
     }
 end)()
-
--- ========== MODULE INITIALIZATION ==========
+-- module sections 
+ Tabs.Binds:AddSection("Movement", "snowflake")
 
 function Movement.Init(nxs)
     Nexus = nxs
