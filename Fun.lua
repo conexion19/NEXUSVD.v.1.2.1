@@ -18,7 +18,7 @@ function Fun.Init(nxs)
     
     local Tabs = Nexus.Tabs
 
-    Tabs.Fun:AddSection("Section", "snowflake")
+    Tabs.Fun:AddSection("Other", "snowflake")
     
     -- ========== EMOTES SYSTEM ==========
     local emotesInitialized = Fun.InitializeEmotesSystem()
