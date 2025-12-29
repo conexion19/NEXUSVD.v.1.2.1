@@ -2,7 +2,6 @@ local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/zawere
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/zawerex/InterfaceManager/refs/heads/main/InterfaceManager.lua"))()
 
--- Сервисы
 local Services = {
     Players = game:GetService("Players"),
     RunService = game:GetService("RunService"),
@@ -14,15 +13,12 @@ local Services = {
     TweenService = game:GetService("TweenService")
 }
 
--- Платформа
 local IS_MOBILE = (Services.UserInputService.TouchEnabled and not Services.UserInputService.KeyboardEnabled)
 local IS_DESKTOP = (Services.UserInputService.KeyboardEnabled and not Services.UserInputService.TouchEnabled)
 
--- Основные переменные
 local Player = Services.Players.LocalPlayer
 local Camera = Services.Workspace.CurrentCamera
 
--- Глобальный Nexus
 _G.Nexus = {
     Player = Player,
     Camera = Camera,
@@ -57,9 +53,6 @@ _G.Nexus = {
     }
 }
 
--- ========== ПОЛЕЗНЫЕ ФУНКЦИИ (из Helpers) ==========
-
--- Основные функции персонажа
 _G.Nexus.getCharacter = function()
     return Player.Character
 end
@@ -74,7 +67,6 @@ _G.Nexus.getRootPart = function()
     return char and char:FindFirstChild("HumanoidRootPart")
 end
 
--- Безопасные функции
 _G.Nexus.SafeCallback = function(callback, ...)
     if type(callback) == "function" then
         local success, result = pcall(callback, ...)
@@ -95,7 +87,6 @@ _G.Nexus.safeDisconnect = function(conn)
     return nil
 end
 
--- Проверка ролей (нужны для модулей)
 _G.Nexus.IsKiller = function(targetPlayer)
     targetPlayer = targetPlayer or Player
     if not targetPlayer.Team then return false end
@@ -119,7 +110,6 @@ _G.Nexus.GetRole = function(targetPlayer)
     return "Survivor"
 end
 
--- Утилиты (если используются)
 _G.Nexus.Notify = function(title, content, duration)
     Fluent:Notify({
         Title = title,
@@ -145,12 +135,9 @@ _G.Nexus.Clamp = function(value, min, max)
     return math.max(min, math.min(max, value))
 end
 
--- ========== СОЗДАНИЕ UI ==========
-
 local function createUI()
     local windowSize = _G.Nexus.IS_MOBILE and UDim2.fromOffset(350, 200) or UDim2.fromOffset(580,550)
     
-    -- Создаем главное окно
     _G.Nexus.Window = Fluent:CreateWindow({
         Title = "NEXUS",
         SubTitle = "Violence District",
@@ -167,8 +154,7 @@ local function createUI()
         UserInfoSubtitle = "user",
         UserInfoSubtitleColor = Color3.fromRGB(255, 250, 250)
     })
-    
-    -- Создаем вкладки
+
     _G.Nexus.Tabs = {}
     _G.Nexus.Tabs.Main = _G.Nexus.Window:AddTab({ Title = "Survivor", Icon = "snowflake" })
     _G.Nexus.Tabs.Killer = _G.Nexus.Window:AddTab({ Title = "Killer", Icon = "snowflake" })
@@ -182,8 +168,6 @@ local function createUI()
     
     return true
 end
-
--- ========== ЗАГРУЗКА МОДУЛЕЙ ==========
 
 local ModuleUrls = {
     Survivor = "https://raw.githubusercontent.com/zawerex/iolence-rict-script-vvv.1111/refs/heads/main/Survivor%20Module.lua",
@@ -207,7 +191,6 @@ local function loadModule(url)
     return nil
 end
 
--- Параллельная загрузка
 local loaded = 0
 local total = 0
 for name, url in pairs(ModuleUrls) do
@@ -221,14 +204,11 @@ for name, url in pairs(ModuleUrls) do
     end)
 end
 
--- Ожидание загрузки
+
 while loaded < total do
     Services.RunService.Heartbeat:Wait()
 end
 
--- ========== ИНИЦИАЛИЗАЦИЯ ==========
-
--- Сначала создаем UI
 createUI()
 
 local function initModule(name)
@@ -239,7 +219,6 @@ local function initModule(name)
     return false
 end
 
--- Порядок инициализации (UI уже создан, остальные модули)
 local initOrder = {"Survivor", "Killer", "Movement", "Fun", "Visual", "Binds"}
 
 for _, name in ipairs(initOrder) do
@@ -248,9 +227,6 @@ for _, name in ipairs(initOrder) do
     end
 end
 
--- ========== НАСТРОЙКА СОХРАНЕНИЯ ==========
-
--- Настройка сохранения
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
@@ -258,7 +234,6 @@ SaveManager:SetIgnoreIndexes({})
 InterfaceManager:SetFolder("FluentScriptHub")
 SaveManager:SetFolder("FluentScriptHub/violence-district")
 
--- Вкладка Settings
 if _G.Nexus.Window then
     _G.Nexus.Tabs.Settings = _G.Nexus.Window:AddTab({ Title = "Settings", Icon = "settings" })
     
@@ -269,9 +244,6 @@ if _G.Nexus.Window then
     SaveManager:LoadAutoloadConfig()
 end
 
--- ========== ЗАВЕРШЕНИЕ ==========
-
--- Уведомление
 local notificationContent = IS_MOBILE and "Nexus loaded (Mobile)" or "Nexus loaded"
 Fluent:Notify({
     Title = "Nexus",
@@ -279,7 +251,6 @@ Fluent:Notify({
     Duration = 3
 })
 
--- Функция очистки
 local function cleanup()
     for _, module in pairs(_G.Nexus.Modules) do
         if module and type(module.Cleanup) == "function" then
@@ -288,14 +259,12 @@ local function cleanup()
     end
 end
 
--- Очистка при выходе
 Services.Players.PlayerRemoving:Connect(function(leavingPlayer)
     if leavingPlayer == Player then
         cleanup()
     end
 end)
 
--- Для отладки можно добавить в глобальный объект
 _G.Nexus.Cleanup = cleanup
 
 return _G.Nexus
