@@ -1236,14 +1236,14 @@ function Visual.Init(nxs)
     -- ========== VISUAL EFFECTS ==========
     local NoShadowToggle = Tabs.Visual:AddToggle("NoShadow", {
         Title = "No Shadow", 
-        Description = "", 
+        Description = "remove shadows in the game", 
         Default = false
     })
     NoShadowToggle:OnChanged(function(v) Visual.ToggleNoShadow(v) end)
 
     local NoFogToggle = Tabs.Visual:AddToggle("NoFog", {
         Title = "No Fog", 
-        Description = "", 
+        Description = "remove fog", 
         Default = false
     })
     
@@ -1255,20 +1255,20 @@ function Visual.Init(nxs)
 
     local FullBrightToggle = Tabs.Visual:AddToggle("FullBright", {
         Title = "FullBright", 
-        Description = "", 
+        Description = "lighten the map , make it saturated", 
         Default = false
     })
     FullBrightToggle:OnChanged(function(v) Visual.ToggleFullBright(v) end)
 
     local TimeChangerToggle = Tabs.Visual:AddToggle("TimeChanger", {
         Title = "Time Changer", 
-        Description = "", 
+        Description = "change the time of day", 
         Default = false
     })
 
     local TimeSlider = Tabs.Visual:AddSlider("TimeValue", {
         Title = "Time of Day", 
-        Description = "",
+        Description = "change the time of day (24 hours)",
         Default = 14,
         Min = 0,
         Max = 24,
