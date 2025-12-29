@@ -1708,13 +1708,14 @@ local function ResetAllHealing()
 end
 
 -- ========== MODULE INITIALIZATION ==========
- Tabs.Main:AddSection("Survivor", "snowflake") -- Create section with icon
 
 function Survivor.Init(nxs)
     Nexus = nxs
     
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
+    
+     Tabs.Main:AddSection("Survivor", "snowflake") -- Create section with icon
     
     local CrosshairToggle = Tabs.Main:AddToggle("Crosshair", {
         Title = "Crosshair", 
