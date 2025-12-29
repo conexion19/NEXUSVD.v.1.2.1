@@ -4,7 +4,7 @@ local Visual = {
     Connections = {},
     ESP = {
         lastUpdate = 0,
-        UPDATE_INTERVAL = 0.10,
+        UPDATE_INTERVAL = 0.1,
         settings = {
             Survivors  = {Enabled=false, Color=Color3.fromRGB(100,255,100), Colorpicker = nil},
             Killers    = {Enabled=false, Color=Color3.fromRGB(255,100,100), Colorpicker = nil},
@@ -12,12 +12,16 @@ local Visual = {
             Pallets    = {Enabled=false, Color=Color3.fromRGB(120,80,40), Colorpicker = nil},
             ExitGates  = {Enabled=false, Color=Color3.fromRGB(200,200,100), Colorpicker = nil},
             Windows    = {Enabled=false, Color=Color3.fromRGB(100,200,200), Colorpicker = nil},
-            Hooks      = {Enabled=false, Color=Color3.fromRGB(100, 50, 150), Colorpicker = nil}
+            Hooks      = {Enabled=false, Color=Color3.fromRGB(100, 50, 150), Colorpicker = nil},
+            Gifts      = {Enabled=false, Color=Color3.fromRGB(255, 182, 193), Colorpicker = nil}  -- Добавлен Gift ESP
         },
         trackedObjects = {},
         espConnections = {},
         espLoopRunning = false,
-        showGeneratorPercent = true
+        showGeneratorPercent = true,
+        autoFarmGiftEnabled = false,  
+        autoFarmRunning = false,
+        currentGiftIndex = 1
     },
     AdvancedESP = {
         settings = {
@@ -172,10 +176,10 @@ function Visual.EnsureLabel(model, text, isGenerator, textColor)
             textLabel.RichText = true
             textLabel.Text = text
             if isGenerator then
-                textLabel.TextSize = 14
+                textLabel.TextSize = 10
                 lbl.StudsOffset = Vector3.new(0,2.5,0)
             else
-                textLabel.TextSize = 12
+                textLabel.TextSize = 10
                 lbl.StudsOffset = Vector3.new(0,3,0)
             end
             textLabel.TextStrokeTransparency = 0.1
@@ -242,6 +246,162 @@ function Visual.GetRole(targetPlayer)
     return "Survivor"
 end
 
+-- ========== GIFT ESP ФУНКЦИИ ИЗ ПЕРВОГО КОДА ==========
+
+function Visual.IsValidGift(obj)
+    if obj.Name:lower():find("gift") then
+        for _, child in ipairs(obj:GetDescendants()) do
+            if child:IsA("SurfaceAppearance") then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function Visual.GetAllGifts()
+    local gifts = {}
+    for obj, typeName in pairs(Visual.ESP.trackedObjects) do
+        if obj and obj.Parent and typeName == "Gifts" and Visual.IsValidGift(obj) then
+            table.insert(gifts, obj)
+        end
+    end
+    return gifts
+end
+
+function Visual.FindChristmasTree()
+    local map = Nexus.Services.Workspace:FindFirstChild("Map")
+    if not map then return nil end
+    
+    local christmasTree = map:FindFirstChild("chris")
+    if christmasTree then
+        christmasTree = christmasTree:FindFirstChild("chrismta tute")
+        if christmasTree then
+            christmasTree = christmasTree:FindFirstChild("Model")
+            if christmasTree then
+                christmasTree = christmasTree:FindFirstChild("ChristmasTree")
+                if christmasTree then
+                    local treePine = christmasTree:FindFirstChild("TreePine")
+                    if treePine then
+                        return treePine
+                    end
+                end
+            end
+        end
+    end
+    
+    for _, obj in ipairs(Nexus.Services.Workspace:GetDescendants()) do
+        if obj.Name == "TreePine" then
+            return obj
+        end
+    end
+    
+    return nil
+end
+
+function Visual.TeleportToObject(obj)
+    local localPlayer = Nexus.Player
+    if not localPlayer or not localPlayer.Character then
+        return false
+    end
+    
+    local humanoid = localPlayer.Character:FindFirstChild("Humanoid")
+    local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not rootPart then
+        return false
+    end
+    
+    if obj then
+        local targetPosition
+        if obj:IsA("BasePart") then
+            targetPosition = obj.Position + Vector3.new(0, 3, 0)
+        elseif obj:IsA("Model") and obj.PrimaryPart then
+            targetPosition = obj.PrimaryPart.Position + Vector3.new(0, 3, 0)
+        else
+            targetPosition = obj.Position + Vector3.new(0, 3, 0)
+        end
+        
+        local success = pcall(function()
+            rootPart.CFrame = CFrame.new(targetPosition)
+        end)
+        
+        return success
+    end
+    
+    return false
+end
+
+function Visual.SimulateMouseClick()
+    local virtualInputManager = game:GetService("VirtualInputManager")
+    if virtualInputManager then
+        pcall(function()
+            virtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+            task.wait(0.1)
+            virtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+        end)
+    end
+end
+
+function Visual.AutoFarmGiftLoop()
+    if Visual.ESP.autoFarmRunning then
+        return
+    end
+    
+    Visual.ESP.autoFarmRunning = true
+    Visual.ESP.currentGiftIndex = 1
+    
+    task.spawn(function()
+        while Visual.ESP.autoFarmGiftEnabled do
+            local gifts = Visual.GetAllGifts()
+            
+            if #gifts > 0 then
+                if Visual.ESP.currentGiftIndex > #gifts then
+                    Visual.ESP.currentGiftIndex = 1
+                end
+                
+                local currentGift = gifts[Visual.ESP.currentGiftIndex]
+                
+                if currentGift and currentGift.Parent and Visual.IsValidGift(currentGift) then
+                    Visual.TeleportToObject(currentGift)
+                    task.wait(0.5)
+                    
+                    Visual.SimulateMouseClick()
+                    task.wait(3)
+                    
+                    local christmasTree = Visual.FindChristmasTree()
+                    if christmasTree then
+                        Visual.TeleportToObject(christmasTree)
+                        task.wait(3)
+                    else
+                        task.wait(3)
+                    end
+                    
+                    Visual.ESP.currentGiftIndex = Visual.ESP.currentGiftIndex + 1
+                else
+                    Visual.ESP.currentGiftIndex = Visual.ESP.currentGiftIndex + 1
+                end
+            else
+                task.wait(2)
+            end
+            
+            task.wait(0.5)
+        end
+        
+        Visual.ESP.autoFarmRunning = false
+    end)
+end
+
+function Visual.ToggleAutoFarmGift(enabled)
+    Visual.ESP.autoFarmGiftEnabled = enabled
+    
+    if enabled then
+        Visual.AutoFarmGiftLoop()
+    else
+        Visual.ESP.autoFarmRunning = false
+    end
+end
+
 function Visual.AddObjectToTrack(obj)
     local nameLower = obj.Name:lower()
     
@@ -258,6 +418,10 @@ function Visual.AddObjectToTrack(obj)
         Visual.ESP.trackedObjects[obj] = "Windows"
     elseif nameLower:find("hook") then 
         Visual.ESP.trackedObjects[obj] = "Hooks"
+    elseif nameLower:find("gift") then
+        if Visual.IsValidGift(obj) then
+            Visual.ESP.trackedObjects[obj] = "Gifts"
+        end
     end
 end
 
@@ -521,7 +685,7 @@ function Visual.CreateAdvancedESP(plr)
     })
     
     d.Name = create("Text",{
-        Size = 20,
+        Size = 10,
         Center = true,
         Outline = true,
         Color = Color3.new(1,1,1),
@@ -529,7 +693,7 @@ function Visual.CreateAdvancedESP(plr)
     })
     
     d.Distance = create("Text",{
-        Size = 16,
+        Size = 10,
         Center = true,
         Outline = true,
         Color = Color3.new(0.8,0.8,0.8),
@@ -560,7 +724,7 @@ function Visual.CreateAdvancedESP(plr)
     d.HealthMask.Transparency = 0.3
     
     d.HealthText = create("Text",{
-        Size = 14,
+        Size = 9,
         Center = true,
         Outline = true,
         Color = Color3.new(1,1,1),
@@ -1267,6 +1431,36 @@ function Visual.Init(nxs)
     end)
     WindowColorpicker:SetValueRGB(Color3.fromRGB(100, 200, 200))
 
+    -- ========== GIFT ESP ДОБАВЛЕНИЕ ==========
+    local ESPGiftsToggle = Tabs.Visual:AddToggle("ESPGifts", {
+        Title = "Gift ESP", 
+        Description = "Highlights Christmas gifts", 
+        Default = false
+    })
+    ESPGiftsToggle:OnChanged(function(v)
+        Visual.ToggleESPSetting("Gifts", v)
+    end)
+
+    local GiftColorpicker = Tabs.Visual:AddColorpicker("GiftColorpicker", {
+        Title = "Gift Color",
+        Default = Color3.fromRGB(255, 182, 193)
+    })
+    GiftColorpicker:OnChanged(function()
+        Visual.ESP.settings.Gifts.Color = GiftColorpicker.Value
+        Visual.UpdateESPColors()
+    end)
+    GiftColorpicker:SetValueRGB(Color3.fromRGB(255, 182, 193))
+
+    -- ========== AUTO FARM GIFT ДОБАВЛЕНИЕ ==========
+    local AutoFarmGiftToggle = Tabs.Visual:AddToggle("AutoFarmGift", {
+        Title = "AutoFarm Gift",
+        Description = "Automatically collects Christmas gifts",
+        Default = false
+    })
+    AutoFarmGiftToggle:OnChanged(function(v)
+        Visual.ToggleAutoFarmGift(v)
+    end)
+
     -- Store colorpickers
     Visual.ESP.settings.Survivors.Colorpicker = SurvivorColorpicker
     Visual.ESP.settings.Killers.Colorpicker = KillerColorpicker
@@ -1274,6 +1468,7 @@ function Visual.Init(nxs)
     Visual.ESP.settings.Pallets.Colorpicker = PalletColorpicker
     Visual.ESP.settings.ExitGates.Colorpicker = GateColorpicker
     Visual.ESP.settings.Windows.Colorpicker = WindowColorpicker
+    Visual.ESP.settings.Gifts.Colorpicker = GiftColorpicker  -- Добавлен Colorpicker для подарков
 
     -- ========== ADVANCED ESP ==========
     Tabs.Visual:AddSection("Advanced ESP Settings")
@@ -1374,6 +1569,9 @@ end
 function Visual.Cleanup()
     Visual.StopESP()
     Visual.StopAdvancedESP()
+    
+    -- Останавливаем AutoFarm
+    Visual.ToggleAutoFarmGift(false)
     
     -- Restore visual effects
     Visual.ToggleNoShadow(false)
