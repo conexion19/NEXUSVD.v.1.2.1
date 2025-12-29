@@ -2173,6 +2173,8 @@ function Killer.Init(nxs)
     
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
+
+     Tabs.Killer:AddSection("Killer", "snowflake")
     
     local SpearCrosshairToggle = Tabs.Killer:AddToggle("SpearCrosshair", {
         Title = "Spear Crosshair (Veil)", 
