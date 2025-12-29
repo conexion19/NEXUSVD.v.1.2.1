@@ -21,7 +21,8 @@ local Visual = {
             colorpicker = nil,
             outline = false,
             outlineColor = Color3.fromRGB(0,0,0),
-            outlineColorpicker = nil
+            outlineColorpicker = nil,
+            boxOutlineToggle = nil
         },
         namesESP = {
             enabled = false,
@@ -32,19 +33,29 @@ local Visual = {
             outlineColorpicker = nil,
             font = 2,
             size = 15,
-            showDistance = false
+            showDistance = false,
+            namesOutlineToggle = nil,
+            namesColorpicker = nil,
+            namesOutlineColorpicker = nil,
+            showDistanceToggle = nil
         },
         healthBar = {
             enabled = false,
             side = "Left",
-            offset = 8
+            offset = 8,
+            healthBarToggle = nil
+        },
+        teamCheck = {
+            enabled = false,
+            teamCheckToggle = nil
         },
         trackedObjects = {},
         espConnections = {},
         espLoopRunning = false,
         showGeneratorPercent = true,
         espObjects = {},
-        drawingConnections = {}
+        drawingConnections = {},
+        uiElements = {}
     },
     Effects = {
         noShadowEnabled = false,
@@ -226,7 +237,7 @@ function Visual.GetRole(targetPlayer)
 end
 
 function Visual.GetTeamColor(targetPlayer)
-    if not Visual.ESP.boxESP.teamCheck then
+    if not Visual.ESP.teamCheck.enabled then
         return Visual.ESP.boxESP.color
     end
     
@@ -621,39 +632,79 @@ function Visual.ToggleESPSetting(settingName, enabled)
     end
 end
 
+function Visual.UpdateUIElements()
+    if Visual.ESP.uiElements.BoxOutlineToggle then
+        Visual.ESP.uiElements.BoxOutlineToggle.Visible = Visual.ESP.boxESP.enabled
+    end
+    if Visual.ESP.uiElements.BoxOutlineColorpicker then
+        Visual.ESP.uiElements.BoxOutlineColorpicker.Visible = Visual.ESP.boxESP.enabled and Visual.ESP.boxESP.outline
+    end
+    
+    if Visual.ESP.uiElements.NamesESP then
+        Visual.ESP.uiElements.NamesESP.Visible = Visual.ESP.boxESP.enabled
+    end
+    if Visual.ESP.uiElements.NamesOutlineToggle then
+        Visual.ESP.uiElements.NamesOutlineToggle.Visible = Visual.ESP.boxESP.enabled and Visual.ESP.namesESP.enabled
+    end
+    if Visual.ESP.uiElements.NamesColorpicker then
+        Visual.ESP.uiElements.NamesColorpicker.Visible = Visual.ESP.boxESP.enabled and Visual.ESP.namesESP.enabled
+    end
+    if Visual.ESP.uiElements.NamesOutlineColorpicker then
+        Visual.ESP.uiElements.NamesOutlineColorpicker.Visible = Visual.ESP.boxESP.enabled and Visual.ESP.namesESP.enabled and Visual.ESP.namesESP.outline
+    end
+    if Visual.ESP.uiElements.ShowDistanceToggle then
+        Visual.ESP.uiElements.ShowDistanceToggle.Visible = Visual.ESP.boxESP.enabled and Visual.ESP.namesESP.enabled
+    end
+    
+    if Visual.ESP.uiElements.HealthBarToggle then
+        Visual.ESP.uiElements.HealthBarToggle.Visible = Visual.ESP.boxESP.enabled
+    end
+    
+    if Visual.ESP.uiElements.TeamCheckToggle then
+        Visual.ESP.uiElements.TeamCheckToggle.Visible = Visual.ESP.boxESP.enabled
+    end
+end
+
 function Visual.ToggleBoxESP(enabled)
     Visual.ESP.boxESP.enabled = enabled
     Visual.CheckIfDrawingESPNeeded()
+    Visual.UpdateUIElements()
 end
 
 function Visual.ToggleBoxOutline(enabled)
     Visual.ESP.boxESP.outline = enabled
     Visual.CheckIfDrawingESPNeeded()
+    Visual.UpdateUIElements()
 end
 
 function Visual.ToggleNamesESP(enabled)
     Visual.ESP.namesESP.enabled = enabled
     Visual.CheckIfDrawingESPNeeded()
+    Visual.UpdateUIElements()
 end
 
 function Visual.ToggleNamesOutline(enabled)
     Visual.ESP.namesESP.outline = enabled
     Visual.CheckIfDrawingESPNeeded()
+    Visual.UpdateUIElements()
 end
 
 function Visual.ToggleHealthBar(enabled)
     Visual.ESP.healthBar.enabled = enabled
     Visual.CheckIfDrawingESPNeeded()
+    Visual.UpdateUIElements()
 end
 
 function Visual.ToggleTeamCheck(enabled)
-    Visual.ESP.boxESP.teamCheck = enabled
+    Visual.ESP.teamCheck.enabled = enabled
     Visual.CheckIfDrawingESPNeeded()
+    Visual.UpdateUIElements()
 end
 
 function Visual.ToggleShowDistance(enabled)
     Visual.ESP.namesESP.showDistance = enabled
     Visual.CheckIfDrawingESPNeeded()
+    Visual.UpdateUIElements()
 end
 
 function Visual.UpdateESPColors()
@@ -1073,12 +1124,12 @@ function Visual.Init(nxs)
     BoxOutlineColorpicker:SetValueRGB(Color3.fromRGB(0, 0, 0))
     Visual.ESP.boxESP.outlineColorpicker = BoxOutlineColorpicker
 
-    local NamesESPToggle = Tabs.Visual:AddToggle("NamesESP", {
+    local NamesESP = Tabs.Visual:AddToggle("NamesESP", {
         Title = "Names ESP", 
         Description = "Show/hide player names", 
         Default = false
     })
-    NamesESPToggle:OnChanged(function(v) Visual.ToggleNamesESP(v) end)
+    NamesESP:OnChanged(function(v) Visual.ToggleNamesESP(v) end)
 
     local NamesOutlineToggle = Tabs.Visual:AddToggle("NamesOutline", {
         Title = "Names Outline", 
@@ -1127,6 +1178,18 @@ function Visual.Init(nxs)
         Default = false
     })
     TeamCheckToggle:OnChanged(function(v) Visual.ToggleTeamCheck(v) end)
+
+    Visual.ESP.uiElements.BoxOutlineToggle = BoxOutlineToggle
+    Visual.ESP.uiElements.BoxOutlineColorpicker = BoxOutlineColorpicker
+    Visual.ESP.uiElements.NamesESP = NamesESP
+    Visual.ESP.uiElements.NamesOutlineToggle = NamesOutlineToggle
+    Visual.ESP.uiElements.NamesColorpicker = NamesColorpicker
+    Visual.ESP.uiElements.NamesOutlineColorpicker = NamesOutlineColorpicker
+    Visual.ESP.uiElements.ShowDistanceToggle = ShowDistanceToggle
+    Visual.ESP.uiElements.HealthBarToggle = HealthBarToggle
+    Visual.ESP.uiElements.TeamCheckToggle = TeamCheckToggle
+
+    Visual.UpdateUIElements()
 
     Visual.CheckIfDrawingESPNeeded()
 
