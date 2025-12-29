@@ -608,11 +608,12 @@ function Visual.ToggleBoxESP(enabled)
             end)
         end
     else
-for _, espData in pairs(Visual.ESP.boxESPObjects) do
-    espData.Box.Visible = false
-    espData.BoxOutline.Visible = false
+        for _, espData in pairs(Visual.ESP.boxESPObjects) do
+            espData.Box.Visible = false
+            espData.BoxOutline.Visible = false
         end
     end
+end  -- <- Добавить этот END
 
 function Visual.ToggleNamesESP(enabled)
     Visual.ESP.namesESPEnabled = enabled
