@@ -231,8 +231,8 @@ SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({})
-InterfaceManager:SetFolder("FluentScriptHub")
-SaveManager:SetFolder("FluentScriptHub/violence-district")
+InterfaceManager:SetFolder("NexusHUB")
+SaveManager:SetFolder("NexusHUBHub/violence-district")
 
 if _G.Nexus.Window then
     _G.Nexus.Tabs.Settings = _G.Nexus.Window:AddTab({ Title = "Settings", Icon = "settings" })
