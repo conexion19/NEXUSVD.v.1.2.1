@@ -569,121 +569,66 @@ local NoSlowdown = (function()
     local connection = nil
     local teamListeners = {}
 
-    local function IsCrawling(humanoid)
-        if not humanoid then return false end
+    local function setupNoSlowdownForCharacter(character)
+        if not enabled or not isSurvivorTeam() then return end
         
-        -- Проверка состояния ползания
-        local state = humanoid:GetState()
-        if state == Enum.HumanoidStateType.FallingDown or 
-           state == Enum.HumanoidStateType.GettingUp or
-           state == Enum.HumanoidStateType.Freefall then
-            return true
-        end
-        
-        -- Проверка по скорости
-        if humanoid.WalkSpeed < 8 then
-            return true
-        end
-        
-        -- Проверка по анимациям
-        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-            if track.Animation then
-                local animName = track.Animation.AnimationId:lower()
-                if animName:find("crawl") or animName:find("downed") or animName:find("injured") then
-                    return true
-                end
-            end
-        end
-        
-        -- Проверка по атрибутам
-        local character = humanoid.Parent
-        if character and (character:GetAttribute("Downed") or character:GetAttribute("Crawling")) then
-            return true
-        end
-        
-        return false
-    end
-
-    local function UpdateWalkSpeed()
-        if not enabled then return end
-        
-        -- Проверяем, что игрок в команде выживших
-        if not isSurvivorTeam() then return end
-        
-        local character = Nexus.getCharacter()
-        if not character then return end
+        task.wait(0.5) -- Ждем инициализацию персонажа
         
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if not humanoid then return end
-        
-        -- Проверяем, не лежит ли персонаж
-        if IsCrawling(humanoid) then
-            return -- Не работаем, если персонаж ползет
-        end
-        
-        if humanoid.WalkSpeed ~= 16 then
+        if humanoid then
             humanoid:SetAttribute("NoSlowdown", true)
             humanoid.WalkSpeed = 16
+            
+            -- Создаем новое соединение для этого персонажа
+            if connection then
+                connection:Disconnect()
+            end
+            
+            connection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                if enabled and isSurvivorTeam() and humanoid and humanoid.WalkSpeed ~= 16 then
+                    humanoid.WalkSpeed = 16
+                end
+            end)
+            
+            -- Отслеживаем смерть персонажа
+            humanoid.Died:Connect(function()
+                if enabled then
+                    task.wait(2) -- Ждем респавна
+                    local newChar = Nexus.getCharacter()
+                    if newChar then
+                        setupNoSlowdownForCharacter(newChar)
+                    end
+                end
+            end)
         end
     end
-
-    local function setupNoSlowdown()
-        if connection then
-            connection:Disconnect()
-            connection = nil
-        end
-        
+    
+    local function updateNoSlowdownState()
         if enabled and isSurvivorTeam() then
+            local character = Nexus.getCharacter()
+            if character then
+                setupNoSlowdownForCharacter(character)
+            end
+            print("No Slowdown: Activated for Survivor team")
+        elseif enabled then
+            print("No Slowdown: Waiting for Survivor team...")
+            if connection then
+                connection:Disconnect()
+                connection = nil
+            end
+        else
+            if connection then
+                connection:Disconnect()
+                connection = nil
+            end
+            
             local character = Nexus.getCharacter()
             if character then
                 local humanoid = character:FindFirstChildOfClass("Humanoid")
                 if humanoid then
-                    -- Проверяем состояние перед установкой скорости
-                    if not IsCrawling(humanoid) then
-                        humanoid:SetAttribute("NoSlowdown", true)
-                        humanoid.WalkSpeed = 16
-                    end
-                    
-                    -- Отслеживаем изменения скорости и возвращаем к 16
-                    connection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-                        if enabled and isSurvivorTeam() and humanoid then
-                            UpdateWalkSpeed()
-                        end
-                    end)
+                    humanoid:SetAttribute("NoSlowdown", nil)
                 end
             end
-            
-            -- Также отслеживаем появление нового персонажа
-            local charAddedConn
-            charAddedConn = Nexus.Player.CharacterAdded:Connect(function(char)
-                task.wait(0.5) -- Даем время на инициализацию
-                if enabled and isSurvivorTeam() then
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        -- Проверяем состояние перед установкой скорости
-                        if not IsCrawling(hum) then
-                            hum:SetAttribute("NoSlowdown", true)
-                            hum.WalkSpeed = 16
-                        end
-                        
-                        -- Обновляем соединение для нового персонажа
-                        if connection then
-                            connection:Disconnect()
-                        end
-                        
-                        connection = hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-                            if enabled and isSurvivorTeam() and hum then
-                                UpdateWalkSpeed()
-                            end
-                        end)
-                    end
-                end
-                charAddedConn:Disconnect()
-            end)
-            
-            print("No Slowdown: Activated for Survivor team")
-        elseif enabled then
-            print("No Slowdown: Waiting for Survivor team...")
         end
     end
     
@@ -707,10 +652,17 @@ local NoSlowdown = (function()
         teamListeners = {}
         
         -- Добавляем слушатель смены команды
-        table.insert(teamListeners, setupTeamListener(setupNoSlowdown))
+        table.insert(teamListeners, setupTeamListener(updateNoSlowdownState))
+        
+        -- Добавляем слушатель появления персонажа
+        table.insert(teamListeners, setupCharacterListener(function(character)
+            if enabled and isSurvivorTeam() then
+                setupNoSlowdownForCharacter(character)
+            end
+        end))
         
         -- Инициализируем состояние
-        setupNoSlowdown()
+        updateNoSlowdownState()
     end
     
     local function Disable()
@@ -729,7 +681,6 @@ local NoSlowdown = (function()
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if humanoid then
                 humanoid:SetAttribute("NoSlowdown", nil)
-                -- Не сбрасываем скорость, так как игра сама управляет этим
             end
         end
         
@@ -749,13 +700,7 @@ local NoSlowdown = (function()
     return {
         Enable = Enable,
         Disable = Disable,
-        IsEnabled = function() return enabled end,
-        IsCrawling = function()
-            local character = Nexus.getCharacter()
-            if not character then return false end
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            return IsCrawling(humanoid)
-        end
+        IsEnabled = function() return enabled end
     }
 end)()
 
