@@ -146,7 +146,7 @@ local function createUI()
         TabWidth = 120,
         Size = windowSize,  
         Acrylic = false,
-        Theme = "Darker",
+        Theme = "AMOLED",
         MinimizeKey = Enum.KeyCode.LeftControl,
         UserInfo = true,
         UserInfoTop = false,
