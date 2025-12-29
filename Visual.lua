@@ -4,7 +4,7 @@ local Visual = {
     Connections = {},
     ESP = {
         lastUpdate = 0,
-        UPDATE_INTERVAL = 0.1,
+        UPDATE_INTERVAL = 0.10,
         settings = {
             Survivors = {Enabled = false, Color = Color3.fromRGB(100, 255, 100), Colorpicker = nil},
             Killers = {Enabled = false, Color = Color3.fromRGB(255, 100, 100), Colorpicker = nil},
@@ -410,19 +410,25 @@ function Visual.CreateBoxESP(player)
             local width, height = math.floor(40 * scale_factor), math.floor(60 * scale_factor)
             
             espData.Box.Visible = Visual.ESP.boxESPEnabled and IsVisible
-            espData.BoxOutline.Visible = false 
+            espData.BoxOutline.Visible = Visual.ESP.boxESPEnabled and IsVisible
             espData.Name.Visible = Visual.ESP.namesESPEnabled and IsVisible
             espData.HealthBar.Visible = Visual.ESP.healthBarEnabled and IsVisible
             espData.HealthBarOutline.Visible = Visual.ESP.healthBarEnabled and IsVisible
             
-if Visual.ESP.boxESPEnabled and IsVisible then
-    espData.Box.Color = Visual.GetTeamCheckColor(player)
-    espData.Box.Size = Vector2.new(width, height)
-    espData.Box.Position = Vector2.new(Target2dPosition.X - espData.Box.Size.X / 2, Target2dPosition.Y - espData.Box.Size.Y / 2)
-    espData.Box.Thickness = 1
-    espData.Box.ZIndex = 69
-
-end
+            if Visual.ESP.boxESPEnabled and IsVisible then
+                espData.Box.Color = Visual.GetTeamCheckColor(player)
+                espData.Box.Size = Vector2.new(width, height)
+                espData.Box.Position = Vector2.new(Target2dPosition.X - espData.Box.Size.X / 2, Target2dPosition.Y - espData.Box.Size.Y / 2)
+                espData.Box.Thickness = 1
+                espData.Box.ZIndex = 69
+                
+                espData.BoxOutline.Color = Color3.fromRGB(0, 0, 0)
+                espData.BoxOutline.Size = Vector2.new(width, height)
+                espData.BoxOutline.Position = Vector2.new(Target2dPosition.X - espData.Box.Size.X / 2, Target2dPosition.Y - espData.Box.Size.Y / 2)
+                espData.BoxOutline.Thickness = 3
+                espData.BoxOutline.ZIndex = 1
+            end
+            
             if Visual.ESP.namesESPEnabled and IsVisible then
                 espData.Name.Color = Visual.ESP.namesColor
                 espData.Name.Text = player.Name .. " " .. math.floor((workspace.CurrentCamera.CFrame.p - player.Character.HumanoidRootPart.Position).magnitude) .. "m"
@@ -518,7 +524,7 @@ function Visual.UpdateAllBoxESP()
                     local width, height = math.floor(40 * scale_factor), math.floor(60 * scale_factor)
                     
                     espData.Box.Visible = Visual.ESP.boxESPEnabled and IsVisible
-                    espData.BoxOutline.Visible = false  
+                    espData.BoxOutline.Visible = Visual.ESP.boxESPEnabled and IsVisible
                     espData.Name.Visible = Visual.ESP.namesESPEnabled and IsVisible
                     espData.HealthBar.Visible = Visual.ESP.healthBarEnabled and IsVisible
                     espData.HealthBarOutline.Visible = Visual.ESP.healthBarEnabled and IsVisible
@@ -530,6 +536,11 @@ function Visual.UpdateAllBoxESP()
                         espData.Box.Thickness = 1
                         espData.Box.ZIndex = 69
                         
+                        espData.BoxOutline.Color = Color3.fromRGB(0, 0, 0)
+                        espData.BoxOutline.Size = Vector2.new(width, height)
+                        espData.BoxOutline.Position = Vector2.new(Target2dPosition.X - espData.Box.Size.X / 2, Target2dPosition.Y - espData.Box.Size.Y / 2)
+                        espData.BoxOutline.Thickness = 3
+                        espData.BoxOutline.ZIndex = 1
                     end
                     
                     if Visual.ESP.namesESPEnabled and IsVisible then
@@ -613,7 +624,7 @@ function Visual.ToggleBoxESP(enabled)
             espData.BoxOutline.Visible = false
         end
     end
-end  -- <- Добавить этот END
+end
 
 function Visual.ToggleNamesESP(enabled)
     Visual.ESP.namesESPEnabled = enabled
