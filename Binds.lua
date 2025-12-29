@@ -221,7 +221,7 @@ function Binds.Init(nxs)
     Binds.CreateDisplayGUI()
     
     -- ========== SURVIVOR BINDS ==========
-   Tabs.Binds:AddSection("Section", "snowflake")
+   Tabs.Binds:AddSection("Binds", "snowflake")
     
     -- AutoParry
     local AutoParryKeybind = Tabs.Binds:AddKeybind("AutoParryKeybind", {
