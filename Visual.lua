@@ -1232,8 +1232,6 @@ function Visual.Init(nxs)
     
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
-
-     Tabs.Visual:AddSection("Visual & ESP", "snowflake")
     
     -- ========== VISUAL EFFECTS ==========
     local NoShadowToggle = Tabs.Visual:AddToggle("NoShadow", {
