@@ -789,7 +789,7 @@ local FreeCamera = (function()
     }
 end)()
 -- module sections 
- Tabs.Binds:AddSection("Movement", "snowflake")
+ Tabs.Movement:AddSection("Movement", "snowflake")
 
 function Movement.Init(nxs)
     Nexus = nxs
