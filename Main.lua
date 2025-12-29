@@ -157,10 +157,10 @@ local function createUI()
 
     _G.Nexus.Tabs = {}
     _G.Nexus.Tabs.Main = _G.Nexus.Window:AddTab({ Title = "Survivor", Icon = "user" })
-    _G.Nexus.Tabs.Killer = _G.Nexus.Window:AddTab({ Title = "Killer", Icon = "exec" })
-    _G.Nexus.Tabs.Movement = _G.Nexus.Window:AddTab({ Title = "Movement", Icon = "candy-cane" })
+    _G.Nexus.Tabs.Killer = _G.Nexus.Window:AddTab({ Title = "Killer", Icon = "pipette" })
+    _G.Nexus.Tabs.Movement = _G.Nexus.Window:AddTab({ Title = "Movement", Icon = "pipette" })
     _G.Nexus.Tabs.Fun = _G.Nexus.Window:AddTab({ Title = "Other", Icon = "flame" })
-    _G.Nexus.Tabs.Visual = _G.Nexus.Window:AddTab({ Title = "Visual & ESP", Icon = "sparkle" })
+    _G.Nexus.Tabs.Visual = _G.Nexus.Window:AddTab({ Title = "Visual & ESP", Icon = "wrench" })
     
     if _G.Nexus.IS_DESKTOP then
         _G.Nexus.Tabs.Binds = _G.Nexus.Window:AddTab({ Title = "Binds", Icon = "toggle-right" })
@@ -235,7 +235,7 @@ InterfaceManager:SetFolder("NexusHUB")
 SaveManager:SetFolder("NexusHUBHub/violence-district")
 
 if _G.Nexus.Window then
-    _G.Nexus.Tabs.Settings = _G.Nexus.Window:AddTab({ Title = "Settings", Icon = "settings" })
+    _G.Nexus.Tabs.Settings = _G.Nexus.Window:AddTab({ Title = "Settings", Icon = "settings-2" })
     
     InterfaceManager:BuildInterfaceSection(_G.Nexus.Tabs.Settings)
     SaveManager:BuildConfigSection(_G.Nexus.Tabs.Settings)
