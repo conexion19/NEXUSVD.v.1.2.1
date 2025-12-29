@@ -541,6 +541,8 @@ function Movement.Init(nxs)
         end)
     end
 
+   Tabs.Movement:AddSection("Movement", "snowflake")
+    
     -- ========== INFINITE LUNGE ==========
     if Nexus.IS_DESKTOP then
         local InfiniteLungeToggle = Tabs.Movement:AddToggle("InfiniteLunge", {
