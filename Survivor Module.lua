@@ -1708,6 +1708,7 @@ local function ResetAllHealing()
 end
 
 -- ========== MODULE INITIALIZATION ==========
+ Tabs.Main:AddSection("Survivor", "snowflake") -- Create section with icon
 
 function Survivor.Init(nxs)
     Nexus = nxs
