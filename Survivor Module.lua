@@ -1715,8 +1715,6 @@ function Survivor.Init(nxs)
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
     
-     Tabs.Main:AddSection("Survivor", "snowflake") -- Create section with icon
-    
     local CrosshairToggle = Tabs.Main:AddToggle("Crosshair", {
         Title = "Crosshair", 
         Description = "Display crosshair in the center of screen", 
@@ -1806,7 +1804,7 @@ function Survivor.Init(nxs)
     end)
 
     local AutoParryRangeSlider = Tabs.Main:AddSlider("AutoParryRange", {
-        Title = "parry distance",
+        Title = "ping compensation",
         Description = "",
         Default = 10,
         Min = 0,
@@ -1950,7 +1948,6 @@ function Survivor.Init(nxs)
 end
 
 function Survivor.Cleanup()
-    
     Crosshair.Disable()
     AutoVictory.Disable()
     NoSlowdown.Disable()
@@ -1967,7 +1964,6 @@ function Survivor.Cleanup()
         Nexus.safeDisconnect(connection)
     end
     Survivor.Connections = {}
-    
 end
 
 return Survivor
