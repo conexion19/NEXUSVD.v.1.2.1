@@ -473,7 +473,8 @@ end
 local NoSlowdown = (function()
     local enabled = false
     local slowdownConnection = nil
-    local originalSpeed = 16
+    local originalSpeed = nil
+    local speedLocked = false
 
     local function GetRole()
         if not Nexus.Player.Team then return "Survivor" end
@@ -484,25 +485,34 @@ local NoSlowdown = (function()
         return "Survivor"
     end
     
+    local function saveOriginalSpeed()
+        local humanoid = Nexus.getHumanoid()
+        if humanoid then
+            originalSpeed = humanoid.WalkSpeed
+            speedLocked = false
+            print("NoSlowdown: Saved original speed: " .. originalSpeed)
+        end
+    end
+    
+    local function restoreOriginalSpeed()
+        local humanoid = Nexus.getHumanoid()
+        if humanoid and originalSpeed then
+            humanoid.WalkSpeed = originalSpeed
+            print("NoSlowdown: Restored original speed: " .. originalSpeed)
+        end
+        speedLocked = false
+    end
+    
     local function Enable()
         if enabled then return end
         enabled = true
         Nexus.States.NoSlowdownEnabled = true
 
-        local character = Nexus.getCharacter()
-        local humanoid = Nexus.getHumanoid()
-        if humanoid then
-            originalSpeed = humanoid.WalkSpeed
-        end
+        -- Сохраняем оригинальную скорость только один раз при включении
+        saveOriginalSpeed()
         
         slowdownConnection = Nexus.Services.RunService.Heartbeat:Connect(function()
-            if not enabled then 
-                if slowdownConnection then
-                    slowdownConnection:Disconnect()
-                    slowdownConnection = nil
-                end
-                return 
-            end
+            if not enabled then return end
             
             if GetRole() ~= "Killer" then 
                 return 
@@ -514,17 +524,45 @@ local NoSlowdown = (function()
             local hum = Nexus.getHumanoid()
             if not hum then return end
             
+            -- Если скорость упала ниже 16 (замедление)
             if hum.WalkSpeed < 16 then
-                hum.WalkSpeed = originalSpeed or 16
+                -- Восстанавливаем сохраненную оригинальную скорость
+                if originalSpeed and originalSpeed >= 16 then
+                    hum.WalkSpeed = originalSpeed
+                else
+                    hum.WalkSpeed = 16  -- Минимальная нормальная скорость
+                end
+                speedLocked = true
+            elseif not speedLocked and hum.WalkSpeed > (originalSpeed or 16) then
+                -- Если скорость увеличилась (например, от эффектов), обновляем originalSpeed
+                originalSpeed = hum.WalkSpeed
             end
         end)
         
-        Nexus.Player.CharacterAdded:Connect(function(newChar)
+        -- Обработчик смены персонажа
+        local charAddedConnection
+        charAddedConnection = Nexus.Player.CharacterAdded:Connect(function(newChar)
             if enabled then
+                -- Отключаем старый коннекшн
+                if slowdownConnection then
+                    slowdownConnection:Disconnect()
+                    slowdownConnection = nil
+                end
+                
+                -- Ждем загрузки персонажа
                 task.wait(1)
-                local newHumanoid = newChar:FindFirstChildOfClass("Humanoid")
-                if newHumanoid then
-                    originalSpeed = newHumanoid.WalkSpeed
+                
+                -- Сохраняем новую оригинальную скорость
+                saveOriginalSpeed()
+                
+                -- Перезапускаем цикл Heartbeat
+                if enabled then
+                    Enable() -- Перезапускаем для нового персонажа
+                end
+                
+                -- Отключаем этот коннекшн, чтобы не копились
+                if charAddedConnection then
+                    charAddedConnection:Disconnect()
                 end
             end
         end)
@@ -540,12 +578,10 @@ local NoSlowdown = (function()
             slowdownConnection = nil
         end
         
-        local humanoid = Nexus.getHumanoid()
-        if humanoid and originalSpeed then
-            humanoid.WalkSpeed = originalSpeed
-        end
+        -- Восстанавливаем оригинальную скорость
+        restoreOriginalSpeed()
         
-        print("NoSlowdown Disabled")
+        print("NoSlowdown: Disabled")
     end
     
     return {
@@ -554,7 +590,6 @@ local NoSlowdown = (function()
         IsEnabled = function() return enabled end
     }
 end)()
-
 -- ========== HITBOX EXPAND ==========
 
 local Hitbox = (function()
