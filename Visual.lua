@@ -12,7 +12,8 @@ local Visual = {
             Pallets = {Enabled = false, Color = Color3.fromRGB(120, 80, 40), Colorpicker = nil},
             ExitGates = {Enabled = false, Color = Color3.fromRGB(200, 200, 100), Colorpicker = nil},
             Windows = {Enabled = false, Color = Color3.fromRGB(100, 200, 200), Colorpicker = nil},
-            Hooks = {Enabled = false, Color = Color3.fromRGB(100, 50, 150), Colorpicker = nil}
+            Hooks = {Enabled = false, Color = Color3.fromRGB(100, 50, 150), Colorpicker = nil},
+            Gifts = {Enabled = false, Color = Color3.fromRGB(255, 182, 193), Colorpicker = nil}
         },
         trackedObjects = {},
         espConnections = {},
@@ -218,6 +219,10 @@ function Visual.AddObjectToTrack(obj)
         Visual.ESP.trackedObjects[obj] = "Windows"
     elseif nameLower:find("hook") then 
         Visual.ESP.trackedObjects[obj] = "Hooks"
+    elseif nameLower:find("gift") then
+        if Visual.IsValidGift(obj) then
+            Visual.ESP.trackedObjects[obj] = "Gifts"
+        end
     end
 end
 
@@ -239,6 +244,17 @@ function Visual.IsValidPallet(obj)
         end
     end
     
+    return false
+end
+
+function Visual.IsValidGift(obj)
+    if obj.Name:lower():find("gift") then
+        for _, child in ipairs(obj:GetDescendants()) do
+            if child:IsA("SurfaceAppearance") then
+                return true
+            end
+        end
+    end
     return false
 end
 
@@ -291,7 +307,11 @@ function Visual.UpdateESP()
                 else
                     local color = setting.Colorpicker and setting.Colorpicker.Value or setting.Color
                     Visual.EnsureHighlight(obj, color, true)
-                    Visual.ClearLabel(obj)
+                    if typeName == "Gifts" then
+                        Visual.EnsureLabel(obj, "Gift", false, color)
+                    else
+                        Visual.ClearLabel(obj)
+                    end
                 end
             else
                 Visual.ClearHighlight(obj)
@@ -675,24 +695,66 @@ function Visual.ToggleNoFog(enabled)
             local lighting = Nexus.Services.Lighting
             
             if not Visual.Effects.fogCache then
-                Visual.Effects.fogCache = {
-                    FogEnd = lighting.FogEnd,
-                    FogStart = lighting.FogStart,
-                    FogColor = lighting.FogColor,
-                    FogDensity = lighting.FogDensity,
-                    GlobalShadows = lighting.GlobalShadows
-                }
+                Visual.Effects.fogCache = {}
+                
+                Visual.Effects.fogCache.FogEnd = lighting.FogEnd
+                Visual.Effects.fogCache.FogStart = lighting.FogStart
+                Visual.Effects.fogCache.FogColor = lighting.FogColor
+                Visual.Effects.fogCache.FogDensity = lighting.FogDensity
+                Visual.Effects.fogCache.GlobalShadows = lighting.GlobalShadows
+                Visual.Effects.fogCache.Brightness = lighting.Brightness
+                Visual.Effects.fogCache.ExposureCompensation = lighting.ExposureCompensation
                 
                 for _, effect in ipairs(lighting:GetChildren()) do
-                    if effect:IsA("Atmosphere") or effect.Name:lower():find("fog") then
+                    if effect:IsA("Atmosphere") or 
+                       effect:IsA("BloomEffect") or 
+                       effect:IsA("BlurEffect") or 
+                       effect:IsA("ColorCorrectionEffect") or
+                       effect:IsA("SunRaysEffect") or
+                       effect.Name:lower():find("fog") or
+                       effect.Name:lower():find("bloom") or
+                       effect.Name:lower():find("blur") or
+                       effect.Name:lower():find("color") then
                         Visual.Effects.fogCache[effect.Name] = effect:Clone()
+                    end
+                end
+                
+                local map = Nexus.Services.Workspace:FindFirstChild("Map")
+                if map then
+                    Visual.Effects.fogCache.mapEffects = {}
+                    for _, effect in ipairs(map:GetDescendants()) do
+                        if effect:IsA("Atmosphere") or 
+                           effect:IsA("BloomEffect") or 
+                           effect:IsA("BlurEffect") or 
+                           effect:IsA("ColorCorrectionEffect") or
+                           effect:IsA("SunRaysEffect") then
+                            Visual.Effects.fogCache.mapEffects[effect] = true
+                        end
                     end
                 end
             end
             
             for _, effect in ipairs(lighting:GetChildren()) do
-                if effect:IsA("Atmosphere") or effect.Name:lower():find("fog") then
+                if effect:IsA("Atmosphere") or 
+                   effect:IsA("BloomEffect") or 
+                   effect:IsA("BlurEffect") or 
+                   effect:IsA("ColorCorrectionEffect") or
+                   effect:IsA("SunRaysEffect") or
+                   effect.Name:lower():find("fog") then
                     effect:Destroy()
+                end
+            end
+            
+            local map = Nexus.Services.Workspace:FindFirstChild("Map")
+            if map then
+                for _, effect in ipairs(map:GetDescendants()) do
+                    if effect:IsA("Atmosphere") or 
+                       effect:IsA("BloomEffect") or 
+                       effect:IsA("BlurEffect") or 
+                       effect:IsA("ColorCorrectionEffect") or
+                       effect:IsA("SunRaysEffect") then
+                        effect:Destroy()
+                    end
                 end
             end
             
@@ -700,6 +762,8 @@ function Visual.ToggleNoFog(enabled)
             lighting.FogStart = 0
             lighting.FogDensity = 0
             lighting.FogColor = Color3.fromRGB(255, 255, 255)
+            lighting.Brightness = 2
+            lighting.ExposureCompensation = 1
             
             if Visual.ESP.espConnections.noFog then
                 Visual.ESP.espConnections.noFog:Disconnect()
@@ -726,12 +790,39 @@ function Visual.ToggleNoFog(enabled)
             lighting.FogColor = Visual.Effects.fogCache.FogColor
             lighting.FogDensity = Visual.Effects.fogCache.FogDensity
             lighting.GlobalShadows = Visual.Effects.fogCache.GlobalShadows
+            lighting.Brightness = Visual.Effects.fogCache.Brightness
+            lighting.ExposureCompensation = Visual.Effects.fogCache.ExposureCompensation
             
             for name, cachedEffect in pairs(Visual.Effects.fogCache) do
-                if typeof(cachedEffect) == "Instance" and cachedEffect:IsA("Atmosphere") then
+                if typeof(cachedEffect) == "Instance" then
                     local existing = lighting:FindFirstChild(name)
                     if not existing then
                         cachedEffect:Clone().Parent = lighting
+                    end
+                end
+            end
+            
+            if Visual.Effects.fogCache.mapEffects then
+                local map = Nexus.Services.Workspace:FindFirstChild("Map")
+                if map then
+                    for effect, _ in pairs(Visual.Effects.fogCache.mapEffects) do
+                        if not effect.Parent then
+                            local parent = map
+                            local path = {}
+                            local current = effect
+                            while current and current ~= map do
+                                table.insert(path, 1, current.Name)
+                                current = current.Parent
+                            end
+                            
+                            for i, name in ipairs(path) do
+                                local child = parent:FindFirstChild(name)
+                                if not child then
+                                    break
+                                end
+                                parent = child
+                            end
+                        end
                     end
                 end
             end
@@ -786,14 +877,14 @@ function Visual.Init(nxs)
     
     local NoShadowToggle = Tabs.Visual:AddToggle("NoShadow", {
         Title = "No Shadow", 
-        Description = "on / off", 
+        Description = "Disables all shadows in the game", 
         Default = false
     })
     NoShadowToggle:OnChanged(function(v) Visual.ToggleNoShadow(v) end)
 
     local NoFogToggle = Tabs.Visual:AddToggle("NoFog", {
         Title = "No Fog", 
-        Description = "on / off", 
+        Description = "Removes all fog and atmospheric effects", 
         Default = false
     })
     
@@ -805,20 +896,20 @@ function Visual.Init(nxs)
 
     local FullBrightToggle = Tabs.Visual:AddToggle("FullBright", {
         Title = "FullBright", 
-        Description = "on / off", 
+        Description = "Makes the game brighter", 
         Default = false
     })
     FullBrightToggle:OnChanged(function(v) Visual.ToggleFullBright(v) end)
 
     local TimeChangerToggle = Tabs.Visual:AddToggle("TimeChanger", {
         Title = "Time Changer", 
-        Description = "on / off", 
+        Description = "Changes the time of day", 
         Default = false
     })
 
     local TimeSlider = Tabs.Visual:AddSlider("TimeValue", {
         Title = "Time of Day", 
-        Description = "on / off",
+        Description = "Set the time (0-24 hours)",
         Default = 14,
         Min = 0,
         Max = 24,
@@ -844,14 +935,14 @@ function Visual.Init(nxs)
         end
     end)
 
-        Tabs.Visual:AddParagraph({
+    Tabs.Visual:AddParagraph({
         Title = "ESP Colors information",
         Content = "You can only change the ESP color in the lobby. You won't be able to change the ESP color in-game due to certain game mechanics. This is a temporary issue."
     })
     
     local ShowGeneratorPercentToggle = Tabs.Visual:AddToggle("ESPShowGenPercent", {
         Title = "Show Generator %", 
-        Description = "on / off", 
+        Description = "Shows generator repair percentage", 
         Default = true
     })
     ShowGeneratorPercentToggle:OnChanged(function(v)
@@ -859,9 +950,11 @@ function Visual.Init(nxs)
         Visual.UpdateESPDisplay()
     end)
 
+    Tabs.Visual:AddSection("Player ESP Settings")
+
     local ESPSurvivorsToggle = Tabs.Visual:AddToggle("ESPSurvivors", {
         Title = "Survivors ESP", 
-        Description = "on / off", 
+        Description = "Highlights survivors", 
         Default = false
     })
     ESPSurvivorsToggle:OnChanged(function(v)
@@ -880,7 +973,7 @@ function Visual.Init(nxs)
 
     local ESPKillersToggle = Tabs.Visual:AddToggle("ESPKillers", {
         Title = "Killers ESP", 
-        Description = "on / off", 
+        Description = "Highlights killers", 
         Default = false
     })
     ESPKillersToggle:OnChanged(function(v)
@@ -897,9 +990,11 @@ function Visual.Init(nxs)
     end)
     KillerColorpicker:SetValueRGB(Color3.fromRGB(255, 100, 100))
 
+    Tabs.Visual:AddSection("Object ESP Settings")
+
     local ESPHooksToggle = Tabs.Visual:AddToggle("ESPHooks", {
         Title = "Hooks ESP", 
-        Description = "on / off", 
+        Description = "Highlights hooks", 
         Default = false
     })
     ESPHooksToggle:OnChanged(function(v)
@@ -918,7 +1013,7 @@ function Visual.Init(nxs)
 
     local ESPGeneratorsToggle = Tabs.Visual:AddToggle("ESPGenerators", {
         Title = "Generators ESP", 
-        Description = "on / off", 
+        Description = "Highlights generators", 
         Default = false
     })
     ESPGeneratorsToggle:OnChanged(function(v)
@@ -927,7 +1022,7 @@ function Visual.Init(nxs)
 
     local ESPPalletsToggle = Tabs.Visual:AddToggle("ESPPallets", {
         Title = "Pallets ESP", 
-        Description = "on / off", 
+        Description = "Highlights pallets", 
         Default = false
     })
     ESPPalletsToggle:OnChanged(function(v)
@@ -946,7 +1041,7 @@ function Visual.Init(nxs)
 
     local ESPGatesToggle = Tabs.Visual:AddToggle("ESPGates", {
         Title = "Exit Gates ESP", 
-        Description = "on / off", 
+        Description = "Highlights exit gates", 
         Default = false
     })
     ESPGatesToggle:OnChanged(function(v)
@@ -965,7 +1060,7 @@ function Visual.Init(nxs)
 
     local ESPWindowsToggle = Tabs.Visual:AddToggle("ESPWindows", {
         Title = "Windows ESP", 
-        Description = "on / off", 
+        Description = "Highlights windows", 
         Default = false
     })
     ESPWindowsToggle:OnChanged(function(v)
@@ -982,18 +1077,38 @@ function Visual.Init(nxs)
     end)
     WindowColorpicker:SetValueRGB(Color3.fromRGB(100, 200, 200))
 
+    local ESPGiftsToggle = Tabs.Visual:AddToggle("ESPGifts", {
+        Title = "Gift ESP", 
+        Description = "Highlights Christmas gifts", 
+        Default = false
+    })
+    ESPGiftsToggle:OnChanged(function(v)
+        Visual.ToggleESPSetting("Gifts", v)
+    end)
+
+    local GiftColorpicker = Tabs.Visual:AddColorpicker("GiftColorpicker", {
+        Title = "Gift Color",
+        Default = Color3.fromRGB(255, 182, 193)
+    })
+    GiftColorpicker:OnChanged(function()
+        Visual.ESP.settings.Gifts.Color = GiftColorpicker.Value
+        Visual.UpdateESPColors()
+    end)
+    GiftColorpicker:SetValueRGB(Color3.fromRGB(255, 182, 193))
+
     Visual.ESP.settings.Survivors.Colorpicker = SurvivorColorpicker
     Visual.ESP.settings.Killers.Colorpicker = KillerColorpicker
     Visual.ESP.settings.Hooks.Colorpicker = HookColorpicker
     Visual.ESP.settings.Pallets.Colorpicker = PalletColorpicker
     Visual.ESP.settings.ExitGates.Colorpicker = GateColorpicker
     Visual.ESP.settings.Windows.Colorpicker = WindowColorpicker
+    Visual.ESP.settings.Gifts.Colorpicker = GiftColorpicker
 
     Tabs.Visual:AddSection("Box ESP Settings")
 
     local BoxESPToggle = Tabs.Visual:AddToggle("BoxESP", {
         Title = "Box ESP",
-        Description = "on / off",
+        Description = "Draws boxes around players",
         Default = false
     })
     BoxESPToggle:OnChanged(function(v)
@@ -1012,7 +1127,7 @@ function Visual.Init(nxs)
 
     local NamesESPToggle = Tabs.Visual:AddToggle("NamesESP", {
         Title = "Names ESP",
-        Description = "on / off",
+        Description = "Shows player names and distance",
         Default = false
     })
     NamesESPToggle:OnChanged(function(v)
@@ -1031,7 +1146,7 @@ function Visual.Init(nxs)
 
     local TeamCheckToggle = Tabs.Visual:AddToggle("TeamCheck", {
         Title = "Team Check",
-        Description = "on / off",
+        Description = "Shows enemies in red, teammates in blue",
         Default = false
     })
     TeamCheckToggle:OnChanged(function(v)
@@ -1040,7 +1155,7 @@ function Visual.Init(nxs)
 
     local HealthBarToggle = Tabs.Visual:AddToggle("HealthBar", {
         Title = "Health Bar",
-        Description = "on / off",
+        Description = "Shows player health bars",
         Default = false
     })
     HealthBarToggle:OnChanged(function(v)
