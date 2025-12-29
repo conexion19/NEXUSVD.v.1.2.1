@@ -84,7 +84,7 @@ local UseFakeSaw = (function()
             connection = Nexus.Services.RunService.Heartbeat:Connect(function()
                 if enabled and isKillerTeam() then
                     executeFakeSaw()
-                    task.wait(0.5)  -- Интервал между вызовами
+                    task.wait(5)  -- Интервал между вызовами
                 end
             end)
             
