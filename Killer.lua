@@ -71,7 +71,7 @@ local UseFakeSaw = (function()
             connection = Nexus.Services.RunService.Heartbeat:Connect(function()
                 if enabled and isKillerTeam() then
                     executeFakeSaw()
-                    task.wait(5)
+                    task.wait(10)
                 end
             end)
         elseif enabled then
@@ -143,92 +143,145 @@ local UseFakeSaw = (function()
     }
 end)()
 
--- ========== SPEAR CROSSHAIR ==========
+-- ========== SPEAR CROSSHAIR ==========-- 
 
 local SpearCrosshair = (function()
     local enabled = false
-    local crosshairX, crosshairY
+    local crosshairFrame, crosshairX, crosshairY
     local teamListeners = {}
+    local attributeListener = nil
+    local renderConnection = nil
     
     local function createCrosshair()
-        crosshairX = Drawing.new("Line")
-        crosshairY = Drawing.new("Line")
+        if crosshairFrame then return end
         
-        crosshairX.Thickness = 2
-        crosshairX.Transparency = 1
-        crosshairX.Color = Color3.fromRGB(255, 0, 0)
-        crosshairX.Visible = false
+        -- Создаем ScreenGui для прицела
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "SpearCrosshair"
+        screenGui.ResetOnSpawn = false
+        screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        screenGui.Parent = Nexus.Player:WaitForChild("PlayerGui")
         
-        crosshairY.Thickness = 2
-        crosshairY.Transparency = 1
-        crosshairY.Color = Color3.fromRGB(255, 0, 0)
-        crosshairY.Visible = false
+        -- Создаем фрейм для прицела
+        crosshairFrame = Instance.new("Frame")
+        crosshairFrame.Name = "CrosshairFrame"
+        crosshairFrame.BackgroundTransparency = 1
+        crosshairFrame.Size = UDim2.new(0, 40, 0, 40)
+        crosshairFrame.Position = UDim2.new(0.5, -20, 0.5, -20)
+        crosshairFrame.Visible = false
+        crosshairFrame.Parent = screenGui
         
-        local function updatePosition()
-            local viewport = Nexus.Services.Workspace.CurrentCamera.ViewportSize
-            local centerX = viewport.X / 2
-            local centerY = viewport.Y / 2
-            
-            crosshairX.From = Vector2.new(centerX - 10, centerY)
-            crosshairX.To = Vector2.new(centerX + 10, centerY)
-            
-            crosshairY.From = Vector2.new(centerX, centerY - 10)
-            crosshairY.To = Vector2.new(centerX, centerY + 10)
-        end
+        -- Создаем горизонтальную линию
+        crosshairX = Instance.new("Frame")
+        crosshairX.Name = "CrosshairX"
+        crosshairX.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        crosshairX.BorderSizePixel = 0
+        crosshairX.Size = UDim2.new(1, 0, 0, 2)
+        crosshairX.Position = UDim2.new(0, 0, 0.5, -1)
+        crosshairX.Parent = crosshairFrame
         
-        Nexus.Services.Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updatePosition)
-        updatePosition()
+        -- Создаем вертикальную линию
+        crosshairY = Instance.new("Frame")
+        crosshairY.Name = "CrosshairY"
+        crosshairY.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        crosshairY.BorderSizePixel = 0
+        crosshairY.Size = UDim2.new(0, 2, 1, 0)
+        crosshairY.Position = UDim2.new(0.5, -1, 0, 0)
+        crosshairY.Parent = crosshairFrame
     end
     
     local function destroyCrosshair()
-        if crosshairX then 
-            pcall(function() 
-                crosshairX:Remove() 
-                crosshairX = nil 
-            end) 
+        if crosshairFrame and crosshairFrame.Parent then
+            crosshairFrame.Parent:Destroy()
         end
-        if crosshairY then 
-            pcall(function() 
-                crosshairY:Remove() 
-                crosshairY = nil 
-            end) 
+        crosshairFrame = nil
+        crosshairX = nil
+        crosshairY = nil
+    end
+    
+    local function updateCrosshairVisibility()
+        if not crosshairFrame then return end
+        
+        local character = Nexus.Player.Character
+        local shouldShow = false
+        
+        if enabled and isKillerTeam() and character then
+            -- Проверяем атрибут spearmode
+            local spearMode = character:GetAttribute("spearmode")
+            shouldShow = spearMode == "spearing"
+        end
+        
+        crosshairFrame.Visible = shouldShow
+    end
+    
+    local function setupAttributeListener()
+        if attributeListener then
+            attributeListener:Disconnect()
+            attributeListener = nil
+        end
+        
+        if enabled and isKillerTeam() then
+            local character = Nexus.Player.Character
+            if character then
+                attributeListener = character:GetAttributeChangedSignal("spearmode"):Connect(function()
+                    updateCrosshairVisibility()
+                end)
+                updateCrosshairVisibility()
+            end
         end
     end
     
-    local function updateCrosshair()
-        if not crosshairX or not crosshairY then
-            createCrosshair()
-        end
-        
-        local character = Nexus.Player.Character
-        local shouldShow = enabled and isKillerTeam() and character and character:GetAttribute("spearmode") == "spearing"
-        
-        crosshairX.Visible = shouldShow
-        crosshairY.Visible = shouldShow
-        
-        if shouldShow then
-            crosshairX.Color = Color3.fromRGB(255, 0, 0)
-            crosshairY.Color = Color3.fromRGB(255, 0, 0)
-        end
+    local function onCharacterAdded(character)
+        task.wait(0.5) -- Ждем загрузки персонажа
+        setupAttributeListener()
     end
     
     local function updateSpearCrosshairState()
         if enabled and isKillerTeam() then
             createCrosshair()
-            if not Killer.Connections.SpearCrosshair then
-                Killer.Connections.SpearCrosshair = Nexus.Services.RunService.RenderStepped:Connect(updateCrosshair)
+            
+            -- Слушатель изменения атрибута
+            setupAttributeListener()
+            
+            -- Слушатель добавления персонажа
+            local charAddedConn = Nexus.Player.CharacterAdded:Connect(onCharacterAdded)
+            table.insert(teamListeners, charAddedConn)
+            
+            -- Рендер-соединение для обновления позиции (если нужно)
+            if renderConnection then
+                renderConnection:Disconnect()
             end
+            renderConnection = Nexus.Services.RunService.RenderStepped:Connect(function()
+                if crosshairFrame then
+                    -- Центрируем прицел
+                    crosshairFrame.Position = UDim2.new(0.5, -20, 0.5, -20)
+                end
+            end)
+            
+            Killer.Connections.SpearCrosshairRender = renderConnection
+            
+            -- Проверяем сразу при активации
+            updateCrosshairVisibility()
+            
         elseif enabled then
             destroyCrosshair()
-            if Killer.Connections.SpearCrosshair then
-                Killer.Connections.SpearCrosshair:Disconnect()
-                Killer.Connections.SpearCrosshair = nil
+            if attributeListener then
+                attributeListener:Disconnect()
+                attributeListener = nil
+            end
+            if Killer.Connections.SpearCrosshairRender then
+                Killer.Connections.SpearCrosshairRender:Disconnect()
+                Killer.Connections.SpearCrosshairRender = nil
             end
         else
             destroyCrosshair()
-            if Killer.Connections.SpearCrosshair then
-                Killer.Connections.SpearCrosshair:Disconnect()
-                Killer.Connections.SpearCrosshair = nil
+            if attributeListener then
+                attributeListener:Disconnect()
+                attributeListener = nil
+            end
+            if Killer.Connections.SpearCrosshairRender then
+                Killer.Connections.SpearCrosshairRender:Disconnect()
+                Killer.Connections.SpearCrosshairRender = nil
             end
         end
     end
@@ -262,9 +315,14 @@ local SpearCrosshair = (function()
         
         destroyCrosshair()
         
-        if Killer.Connections.SpearCrosshair then
-            Killer.Connections.SpearCrosshair:Disconnect()
-            Killer.Connections.SpearCrosshair = nil
+        if attributeListener then
+            attributeListener:Disconnect()
+            attributeListener = nil
+        end
+        
+        if Killer.Connections.SpearCrosshairRender then
+            Killer.Connections.SpearCrosshairRender:Disconnect()
+            Killer.Connections.SpearCrosshairRender = nil
         end
         
         for _, listener in ipairs(teamListeners) do
@@ -1791,162 +1849,148 @@ end)()
 local AntiBlind = (function()
     local enabled = false
     local isAntiBlindEnabled = false
-    local originalFireServer = nil
-    local originalOnClientEvent = nil
-    local hookedRemotes = {}
+    local hooked = false
+    local originalNamecall = nil
+    local mt = nil
     local teamListeners = {}
-
-    local function findFlashlightRemote()
+    
+    local function findBlindRemotes()
+        local remotes = {}
         local ReplicatedStorage = Nexus.Services.ReplicatedStorage
-        local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
         
-        if remotes then
-            local items = remotes:FindFirstChild("Items")
-            if items then
-                local flashlight = items:FindFirstChild("Flashlight")
-                if flashlight then
-                    local gotBlinded = flashlight:FindFirstChild("GotBlinded")
-                    if gotBlinded and gotBlinded:IsA("RemoteEvent") then
-                        return gotBlinded
-                    end
-                    
-                    for _, child in ipairs(flashlight:GetChildren()) do
-                        if child:IsA("RemoteEvent") and (child.Name:lower():find("blind") or child.Name:lower():find("flash")) then
-                            return child
-                        end
-                    end
-                end
-            end
-            
-            local attacks = remotes:FindFirstChild("Attacks")
-            if attacks then
-                for _, child in ipairs(attacks:GetDescendants()) do
-                    if child:IsA("RemoteEvent") and child.Name:lower():find("blind") then
-                        return child
+        -- Ищем ремоуты связанные с ослеплением
+        local function searchInFolder(folder)
+            if not folder then return end
+            for _, child in ipairs(folder:GetDescendants()) do
+                if child:IsA("RemoteEvent") then
+                    local nameLower = child.Name:lower()
+                    if nameLower:find("blind") or nameLower:find("flash") or 
+                       nameLower:find("gotblinded") or nameLower:find("blinded") then
+                        table.insert(remotes, child)
                     end
                 end
             end
         end
         
-        for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
-            if remote:IsA("RemoteEvent") and (remote.Name:lower():find("blind") or remote.Name:lower():find("flashlight")) then
-                return remote
-            end
-        end
+        -- Проверяем основные пути
+        searchInFolder(ReplicatedStorage:FindFirstChild("Remotes"))
+        searchInFolder(ReplicatedStorage:FindFirstChild("Events"))
         
-        return nil
-    end
-
-    local function hookRemoteEvent(remote)
-        if hookedRemotes[remote] then return end
-        
-        originalFireServer = remote.FireServer
-        originalOnClientEvent = remote.OnClientEvent
-        
-        remote.FireServer = function(self, ...)
-            if isAntiBlindEnabled and isKillerTeam() then
-                return nil
-            end
-            return originalFireServer(self, ...)
-        end
-        
-        if remote:IsA("RemoteEvent") then
-            remote.OnClientEvent = function(self, ...)
-                if isAntiBlindEnabled and isKillerTeam() then
-                    return nil
+        -- Также проверяем корневой ReplicatedStorage
+        for _, child in ipairs(ReplicatedStorage:GetDescendants()) do
+            if child:IsA("RemoteEvent") then
+                local nameLower = child.Name:lower()
+                if nameLower:find("blind") or nameLower:find("flash") then
+                    table.insert(remotes, child)
                 end
-                return originalOnClientEvent(self, ...)
             end
         end
         
-        hookedRemotes[remote] = true
+        return remotes
     end
-
-    local function setupAntiBlind()
-        local flashlightRemote = findFlashlightRemote()
+    
+    local function setupHook()
+        if hooked then return true end
         
-        if flashlightRemote then
-            hookRemoteEvent(flashlightRemote)
-            return true
-        else
-            return false
-        end
-    end
-
-    local function setupMetaTableHook()
-        if not getrawmetatable or not setreadonly or not newcclosure then
+        -- Находим все ремоуты ослепления
+        local blindRemotes = findBlindRemotes()
+        if #blindRemotes == 0 then
             return false
         end
         
-        local success = pcall(function()
-            local gameMetaTable = getrawmetatable(game)
-            if not gameMetaTable then return false end
+        -- Хукаем метатаблицу для перехвата FireServer
+        mt = getrawmetatable(game)
+        if not mt then return false end
+        
+        originalNamecall = mt.__namecall
+        
+        local wasReadonly = isreadonly and isreadonly(mt)
+        if setreadonly then
+            setreadonly(mt, false)
+        end
+        
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
             
-            local originalNamecall = gameMetaTable.__namecall
-            
-            setreadonly(gameMetaTable, false)
-            
-            gameMetaTable.__namecall = newcclosure(function(self, ...)
-                local method = getnamecallmethod()
+            -- Блокируем FireServer для ремоутов ослепления
+            if method == "FireServer" and isAntiBlindEnabled and isKillerTeam() then
+                local remoteName = tostring(self)
+                local remoteNameLower = remoteName:lower()
                 
-                if isAntiBlindEnabled and isKillerTeam() and method == "FireServer" then
-                    local remoteName = tostring(self)
-                    if remoteName:lower():find("blind") or remoteName:lower():find("flash") then
-                        return nil
+                -- Проверяем, является ли это ремоутом ослепления
+                for _, blindRemote in ipairs(blindRemotes) do
+                    if self == blindRemote then
+                        return nil -- Блокируем вызов
                     end
                 end
+                
+                -- Дополнительная проверка по имени
+                if remoteNameLower:find("blind") or 
+                   remoteNameLower:find("flash") or 
+                   remoteNameLower:find("gotblinded") or
+                   remoteNameLower:find("blinded") then
+                    return nil -- Блокируем вызов
+                end
+            end
             
-                return originalNamecall(self, ...)
-            end)
-            
-            setreadonly(gameMetaTable, true)
-            return true
+            return originalNamecall(self, ...)
         end)
         
-        return success
-    end
-
-    local function restoreHooks()
-        for remote, _ in pairs(hookedRemotes) do
-            if remote and remote.Parent then
-                if originalFireServer then
-                    remote.FireServer = originalFireServer
-                end
-                if originalOnClientEvent then
-                    remote.OnClientEvent = originalOnClientEvent
-                end
-            end
+        if setreadonly and wasReadonly then
+            setreadonly(mt, true)
         end
-        hookedRemotes = {}
+        
+        hooked = true
+        return true
     end
-
+    
+    local function removeHook()
+        if not hooked or not mt or not originalNamecall then return end
+        
+        local wasReadonly = isreadonly and isreadonly(mt)
+        if setreadonly then
+            setreadonly(mt, false)
+        end
+        
+        mt.__namecall = originalNamecall
+        
+        if setreadonly and wasReadonly then
+            setreadonly(mt, true)
+        end
+        
+        hooked = false
+        originalNamecall = nil
+        mt = nil
+    end
+    
     local function updateAntiBlind()
         if enabled and isKillerTeam() then
             isAntiBlindEnabled = true
             Nexus.States.KillerAntiBlindEnabled = true
             
-            setupAntiBlind()
-            setupMetaTableHook()
-            
-            task.spawn(function()
-                for i = 1, 5 do
-                    task.wait(2)
-                    if enabled and isKillerTeam() then
-                        setupAntiBlind()
+            if not setupHook() then
+                task.spawn(function()
+                    for i = 1, 5 do
+                        task.wait(1)
+                        if enabled and isKillerTeam() and not hooked then
+                            if setupHook() then break end
+                        end
                     end
-                end
-            end)
+                end)
+            end
+            
         elseif enabled then
             isAntiBlindEnabled = false
             Nexus.States.KillerAntiBlindEnabled = false
-            restoreHooks()
+            removeHook()
+            
         else
             isAntiBlindEnabled = false
             Nexus.States.KillerAntiBlindEnabled = false
-            restoreHooks()
+            removeHook()
         end
     end
-
+    
     local function Enable()
         if enabled then return end
         enabled = true
@@ -1967,163 +2011,13 @@ local AntiBlind = (function()
         
         updateAntiBlind()
     end
-
+    
     local function Disable()
         if not enabled then return end
         enabled = false
         
         isAntiBlindEnabled = false
         Nexus.States.KillerAntiBlindEnabled = false
-        
-        restoreHooks()
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Nexus.safeDisconnect(conn)
-                end
-            else
-                Nexus.safeDisconnect(listener)
-            end
-        end
-        teamListeners = {}
-    end
-
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end
-    }
-end)()
-
--- ========== NO PALLET STUN ==========
-
-local NoPalletStun = (function()
-    local enabled = false
-    local hooked = false
-    local originalConnections = {}
-    local stunRemote, stunOverRemote
-    local teamListeners = {}
-    
-    local function getRemotes()
-        if not stunRemote then
-            local success1, remote1 = pcall(function()
-                return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Pallet"):WaitForChild("Jason"):WaitForChild("Stun")
-            end)
-            
-            local success2, remote2 = pcall(function()
-                return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Pallet"):WaitForChild("Jason"):WaitForChild("Stunover")
-            end)
-            
-            if success1 then stunRemote = remote1 end
-            if success2 then stunOverRemote = remote2 end
-        end
-        return stunRemote, stunOverRemote
-    end
-    
-    local function setupHook()
-        if hooked then return end
-        
-        local stunRemote, stunOverRemote = getRemotes()
-        if not stunRemote or not stunOverRemote then
-            return false
-        end
-        
-        local mt = getrawmetatable(stunRemote)
-        if not mt then return false end
-        
-        local originalNamecall = mt.__namecall
-        
-        local wasReadonly = isreadonly and isreadonly(mt)
-        if setreadonly then
-            setreadonly(mt, false)
-        end
-        
-        mt.__namecall = newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            
-            if self == stunRemote and method == "FireServer" and enabled and isKillerTeam() then
-                if stunOverRemote then
-                    stunOverRemote:FireServer()
-                end
-                return nil
-            end
-            
-            return originalNamecall(self, ...)
-        end)
-        
-        if setreadonly and wasReadonly then
-            setreadonly(mt, true)
-        end
-        
-        local originalOnClientEvent = stunRemote.OnClientEvent
-        stunRemote.OnClientEvent = function(...)
-            if enabled and isKillerTeam() then
-                if stunOverRemote then
-                    stunOverRemote:FireServer()
-                end
-                return nil
-            end
-            return originalOnClientEvent(...)
-        end
-        
-        hooked = true
-        return true
-    end
-    
-    local function removeHook()
-        if not hooked then return end
-        
-        hooked = false
-        originalNamecall = nil
-        mt = nil
-    end
-    
-    local function updateNoPalletStun()
-        if enabled and isKillerTeam() then
-            if not setupHook() then
-                task.spawn(function()
-                    for i = 1, 5 do
-                        task.wait(1)
-                        if enabled and isKillerTeam() and not hooked then
-                            if setupHook() then break end
-                        end
-                    end
-                end)
-            end
-        elseif enabled then
-            removeHook()
-        else
-            removeHook()
-        end
-    end
-    
-    local function Enable()
-        if enabled then return end
-        enabled = true
-        Nexus.States.NoPalletStunEnabled = true
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Nexus.safeDisconnect(conn)
-                end
-            else
-                Nexus.safeDisconnect(listener)
-            end
-        end
-        
-        teamListeners = {}
-        
-        table.insert(teamListeners, setupTeamListener(updateNoPalletStun))
-        
-        updateNoPalletStun()
-    end
-    
-    local function Disable()
-        if not enabled then return end
-        enabled = false
-        Nexus.States.NoPalletStunEnabled = false
         
         removeHook()
         
@@ -2146,6 +2040,201 @@ local NoPalletStun = (function()
     }
 end)()
 
+-- ========== NO PALLET STUN ==========
+
+local NoPalletStun = (function()
+    local enabled = false
+    local hooked = false
+    local originalNamecall = nil
+    local mt = nil
+    local teamListeners = {}
+    local stunRemote, stunOverRemote
+    
+    local function getRemotes()
+        if stunRemote and stunOverRemote then
+            return stunRemote, stunOverRemote
+        end
+        
+        -- Получаем ремоуты с обработкой ошибок
+        local success1, result1 = pcall(function()
+            return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
+                :WaitForChild("Pallet", 5)
+                :WaitForChild("Jason", 5)
+                :WaitForChild("Stun", 5)
+        end)
+        
+        local success2, result2 = pcall(function()
+            return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
+                :WaitForChild("Pallet", 5)
+                :WaitForChild("Jason", 5)
+                :WaitForChild("Stunover", 5)
+        end)
+        
+        if success1 then stunRemote = result1 end
+        if success2 then stunOverRemote = result2 end
+        
+        return stunRemote, stunOverRemote
+    end
+    
+    local function callStunOver()
+        if not stunOverRemote then
+            getRemotes()
+        end
+        
+        if stunOverRemote then
+            pcall(function()
+                stunOverRemote:FireServer()
+            end)
+        end
+    end
+    
+    local function setupHook()
+        if hooked then return true end
+        
+        local stunRemoteFound, stunOverRemoteFound = getRemotes()
+        if not stunRemoteFound then
+            return false
+        end
+        
+        -- Получаем метатаблицу и сохраняем оригинальный __namecall
+        mt = getrawmetatable(stunRemoteFound)
+        if not mt then return false end
+        
+        originalNamecall = mt.__namecall
+        
+        local wasReadonly = isreadonly and isreadonly(mt)
+        if setreadonly then
+            setreadonly(mt, false)
+        end
+        
+        -- Перехватываем вызов FireServer для Stun ремоута
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            
+            -- Если это вызов FireServer для Stun ремоута и функция включена
+            if self == stunRemoteFound and method == "FireServer" and enabled and isKillerTeam() then
+                -- Сначала вызываем оригинальный FireServer
+                local result = originalNamecall(self, ...)
+                
+                -- Затем сразу вызываем stunover
+                task.spawn(function()
+                    callStunOver()
+                end)
+                
+                return result
+            end
+            
+            -- Для всех остальных случаев вызываем оригинальный метод
+            return originalNamecall(self, ...)
+        end)
+        
+        if setreadonly and wasReadonly then
+            setreadonly(mt, true)
+        end
+        
+        hooked = true
+        return true
+    end
+    
+    local function removeHook()
+        if not hooked or not mt or not originalNamecall then return end
+        
+        local wasReadonly = isreadonly and isreadonly(mt)
+        if setreadonly then
+            setreadonly(mt, false)
+        end
+        
+        mt.__namecall = originalNamecall
+        
+        if setreadonly and wasReadonly then
+            setreadonly(mt, true)
+        end
+        
+        hooked = false
+        originalNamecall = nil
+        mt = nil
+        stunRemote = nil
+        stunOverRemote = nil
+    end
+    
+    local function updateNoPalletStun()
+        if enabled and isKillerTeam() then
+            if not setupHook() then
+                -- Пытаемся настроить хук с задержкой
+                task.spawn(function()
+                    for i = 1, 5 do
+                        task.wait(1)
+                        if enabled and isKillerTeam() and not hooked then
+                            if setupHook() then 
+                                break 
+                            end
+                        end
+                    end
+                end)
+            end
+        else
+            removeHook()
+        end
+    end
+    
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.NoPalletStunEnabled = true
+        
+        -- Очищаем старые слушатели
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do
+                    Nexus.safeDisconnect(conn)
+                end
+            else
+                Nexus.safeDisconnect(listener)
+            end
+        end
+        
+        teamListeners = {}
+        
+        -- Добавляем слушатель изменения команды
+        table.insert(teamListeners, setupTeamListener(updateNoPalletStun))
+        
+        -- Обновляем состояние
+        updateNoPalletStun()
+    end
+    
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.NoPalletStunEnabled = false
+        
+        removeHook()
+        
+        -- Очищаем слушатели
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do
+                    Nexus.safeDisconnect(conn)
+                end
+            else
+                Nexus.safeDisconnect(listener)
+            end
+        end
+        teamListeners = {}
+    end
+    
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        GetStatus = function() 
+            return {
+                hooked = hooked,
+                stunRemoteFound = stunRemote ~= nil,
+                stunOverRemoteFound = stunOverRemote ~= nil
+            }
+        end
+    }
+end)()
 -- ========== MASK POWERS ==========
 
 local function activateMaskPower(maskName)
