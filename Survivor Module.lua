@@ -2296,7 +2296,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
-\  -- fake parry -- 
+-- fake parry -- 
 
     local FakeParryToggle = Tabs.Main:AddToggle("FakeParry", {
         Title = "Fake Parry", 
