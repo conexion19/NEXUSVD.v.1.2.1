@@ -492,111 +492,76 @@ end)()
 
 local FastVault = (function()
     local enabled = false
-    local hooked = false
+    local hookInstalled = false
+    local processing = false
     local originalNamecall = nil
-    local teamListeners = {}
     
     local VaultEvent = nil
     local VaultCompleteEvent = nil
     local PalletSlideEvent = nil
-    
-    local function getRemotes()
-        local success = pcall(function()
-            local Remotes = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
-            if Remotes then
-                local Window = Remotes:FindFirstChild("Window")
-                local Pallet = Remotes:FindFirstChild("Pallet")
-                if Window then
-                    VaultEvent = Window:FindFirstChild("VaultEvent")
-                    VaultCompleteEvent = Window:FindFirstChild("VaultCompleteEvent")
-                end
-                if Pallet then
-                    PalletSlideEvent = Pallet:FindFirstChild("PalletSlideEvent")
-                end
-            end
-        end)
-        return VaultEvent ~= nil
-    end
-    
-    local function alignToPoint(point)
-        local character = Nexus.getCharacter()
-        if not character then return end
-        local root = character:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        local dir = (point.CFrame.Position - root.Position) * Vector3.new(1, 0, 1)
-        if dir.Magnitude > 0 then
-            root.CFrame = CFrame.new(root.Position, root.Position + dir.Unit)
-        end
-    end
+    local FastVaultRemote = nil
     
     local function setFlowstate()
-        local character = Nexus.getCharacter()
+        local character = Nexus.Player.Character
         if character then
             pcall(character.SetAttribute, character, "Flowstate", true)
         end
     end
     
     local function setupHook()
-        if hooked then return true end
-        if not getRemotes() then return false end
+        if hookInstalled then return true end
+        
+        local success = pcall(function()
+            local Remotes = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes")
+            VaultEvent = Remotes.Window:WaitForChild("VaultEvent")
+            VaultCompleteEvent = Remotes.Window:WaitForChild("VaultCompleteEvent")
+            PalletSlideEvent = Remotes.Pallet:WaitForChild("PalletSlideEvent")
+            FastVaultRemote = Remotes.Window:FindFirstChild("fastvault")
+        end)
+        
+        if not success or not VaultEvent then return false end
         
         originalNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-            if not enabled or hooked then return originalNamecall(self, ...) end
+            if not enabled or processing then return originalNamecall(self, ...) end
             local method = getnamecallmethod()
             if method ~= "FireServer" then return originalNamecall(self, ...) end
             
             local args = {...}
             
             if self == VaultEvent and args[1] then
-                alignToPoint(args[1])
                 setFlowstate()
-                hooked = true
+                processing = true
+                if FastVaultRemote then
+                    FastVaultRemote:FireServer(Nexus.Player)
+                end
                 VaultEvent:FireServer(args[1], true)
-                hooked = false
+                processing = false
                 return
             end
             
             if self == VaultCompleteEvent and args[1] then
-                hooked = true
+                processing = true
                 VaultCompleteEvent:FireServer(args[1], true)
-                hooked = false
+                processing = false
                 return
             end
             
             if self == PalletSlideEvent and args[1] then
-                alignToPoint(args[1])
-                hooked = true
+                setFlowstate()
+                processing = true
+                if FastVaultRemote then
+                    FastVaultRemote:FireServer(Nexus.Player)
+                end
                 PalletSlideEvent:FireServer(args[1], true)
-                hooked = false
+                processing = false
                 return
             end
             
             return originalNamecall(self, ...)
         end))
         
-        hooked = true
+        hookInstalled = true
         return true
-    end
-    
-    local function removeHook()
-        if not hooked or not originalNamecall then return end
-        -- Note: hookmetamethod cannot be easily reverted, we just disable the logic
-        hooked = false
-    end
-    
-    local function updateFastVault()
-        if enabled and isSurvivorTeam() then
-            if not setupHook() then
-                task.spawn(function()
-                    for i = 1, 5 do
-                        task.wait(1)
-                        if enabled and isSurvivorTeam() and not hooked then
-                            if setupHook() then break end
-                        end
-                    end
-                end)
-            end
-        end
     end
     
     local function Enable()
@@ -605,21 +570,9 @@ local FastVault = (function()
         Nexus.States.FastVaultEnabled = true
         print("Fast Vault: ON")
         
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Nexus.safeDisconnect(conn)
-                end
-            else
-                Nexus.safeDisconnect(listener)
-            end
+        if not hookInstalled then
+            setupHook()
         end
-        
-        teamListeners = {}
-        
-        table.insert(teamListeners, setupTeamListener(updateFastVault))
-        
-        updateFastVault()
     end
     
     local function Disable()
@@ -627,17 +580,6 @@ local FastVault = (function()
         enabled = false
         Nexus.States.FastVaultEnabled = false
         print("Fast Vault: OFF")
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Nexus.safeDisconnect(conn)
-                end
-            else
-                Nexus.safeDisconnect(listener)
-            end
-        end
-        teamListeners = {}
     end
     
     return {
@@ -647,7 +589,7 @@ local FastVault = (function()
     }
 end)()
 
--- ========== AUTO VICTORY (SURVIVOR) ==========
+------ AUTO VICTORY (SURVIVOR) -----
 
 local AutoVictory = (function()
     local enabled = false
@@ -662,7 +604,6 @@ local AutoVictory = (function()
         
         local exitPos = nil
         
-        -- Проверка стандартных карт
         if map:FindFirstChild("RooftopHitbox") or map:FindFirstChild("Rooftop") then
             exitPos = Vector3.new(3098.16, 454.04, -4918.74)
             return exitPos
@@ -678,7 +619,6 @@ local AutoVictory = (function()
             return exitPos
         end
         
-        -- Поиск по названию
         local finish = map:FindFirstChild("Finishline") or map:FindFirstChild("FinishLine") or map:FindFirstChild("Fininshline")
         if finish then
             if finish:IsA("BasePart") then
@@ -690,7 +630,6 @@ local AutoVictory = (function()
             return exitPos
         end
         
-        -- Поиск по имени с "finish"
         for _, obj in ipairs(map:GetDescendants()) do
             if obj.Name:lower():find("finish") then
                 if obj:IsA("BasePart") then
@@ -706,7 +645,6 @@ local AutoVictory = (function()
             end
         end
         
-        -- Fallback позиции
         if not exitPos then
             for _, obj in ipairs(map:GetDescendants()) do
                 if obj:IsA("MeshPart") and obj.Material == Enum.Material.Limestone then
@@ -2263,8 +2201,7 @@ function Survivor.Init(nxs)
         end
     })
 
--- new 
-       local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
+local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Title = "Fast Vault", 
         Description = "Instant vault through windows and pallets", 
         Default = false
@@ -2282,7 +2219,7 @@ function Survivor.Init(nxs)
 
     local TwistSilentAimToggle = Tabs.Main:AddToggle("TwistSilentAim", {
         Title = "Twist of Fate Silent Aim", 
-        Description = "Auto silent aim for Twist of Fate item", 
+        Description = "Auto silent aim", 
         Default = false
     })
 
@@ -2296,7 +2233,7 @@ function Survivor.Init(nxs)
         end)
     end)
 
--- fake parry -- 
+-- FAKE PARRY -- 
 
     local FakeParryToggle = Tabs.Main:AddToggle("FakeParry", {
         Title = "Fake Parry", 
