@@ -153,14 +153,12 @@ local SpearCrosshair = (function()
     local function createCrosshair()
         if crosshairFrame then return end
         
-        -- Создаем ScreenGui для прицела
         local screenGui = Instance.new("ScreenGui")
         screenGui.Name = "SpearCrosshair"
         screenGui.ResetOnSpawn = false
         screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         screenGui.Parent = Nexus.Player:WaitForChild("PlayerGui")
-        
-        -- Создаем фрейм для прицела
+
         crosshairFrame = Instance.new("Frame")
         crosshairFrame.Name = "CrosshairFrame"
         crosshairFrame.BackgroundTransparency = 1
@@ -169,7 +167,6 @@ local SpearCrosshair = (function()
         crosshairFrame.Visible = false
         crosshairFrame.Parent = screenGui
         
-        -- Создаем горизонтальную линию
         crosshairX = Instance.new("Frame")
         crosshairX.Name = "CrosshairX"
         crosshairX.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
@@ -178,7 +175,6 @@ local SpearCrosshair = (function()
         crosshairX.Position = UDim2.new(0, 0, 0.5, -1)
         crosshairX.Parent = crosshairFrame
         
-        -- Создаем вертикальную линию
         crosshairY = Instance.new("Frame")
         crosshairY.Name = "CrosshairY"
         crosshairY.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
@@ -204,7 +200,6 @@ local SpearCrosshair = (function()
         local shouldShow = false
         
         if enabled and isKillerTeam() and character then
-            -- Проверяем атрибут spearmode
             local spearMode = character:GetAttribute("spearmode")
             shouldShow = spearMode == "spearing"
         end
@@ -230,7 +225,7 @@ local SpearCrosshair = (function()
     end
     
     local function onCharacterAdded(character)
-        task.wait(0.5) -- Ждем загрузки персонажа
+        task.wait(0.5) 
         setupAttributeListener()
     end
     
@@ -238,27 +233,23 @@ local SpearCrosshair = (function()
         if enabled and isKillerTeam() then
             createCrosshair()
             
-            -- Слушатель изменения атрибута
             setupAttributeListener()
             
-            -- Слушатель добавления персонажа
             local charAddedConn = Nexus.Player.CharacterAdded:Connect(onCharacterAdded)
             table.insert(teamListeners, charAddedConn)
             
-            -- Рендер-соединение для обновления позиции (если нужно)
             if renderConnection then
                 renderConnection:Disconnect()
             end
             renderConnection = Nexus.Services.RunService.RenderStepped:Connect(function()
                 if crosshairFrame then
-                    -- Центрируем прицел
+                            
                     crosshairFrame.Position = UDim2.new(0.5, -20, 0.5, -20)
                 end
             end)
             
             Killer.Connections.SpearCrosshairRender = renderConnection
             
-            -- Проверяем сразу при активации
             updateCrosshairVisibility()
             
         elseif enabled then
@@ -1518,7 +1509,7 @@ local BeatGameKiller = (function()
     }
 end)()
 
--- ========== ABYSSWALKER CORRUPT ==========
+-- ABYSSWALKER NO CD --
 
 local AbysswalkerCorrupt = (function()
     local enabled = false
@@ -1651,7 +1642,6 @@ local AntiBlind = (function()
         local remotes = {}
         local ReplicatedStorage = Nexus.Services.ReplicatedStorage
         
-        -- Ищем ремоуты связанные с ослеплением
         local function searchInFolder(folder)
             if not folder then return end
             for _, child in ipairs(folder:GetDescendants()) do
@@ -1665,11 +1655,9 @@ local AntiBlind = (function()
             end
         end
         
-        -- Проверяем основные пути
         searchInFolder(ReplicatedStorage:FindFirstChild("Remotes"))
         searchInFolder(ReplicatedStorage:FindFirstChild("Events"))
         
-        -- Также проверяем корневой ReplicatedStorage
         for _, child in ipairs(ReplicatedStorage:GetDescendants()) do
             if child:IsA("RemoteEvent") then
                 local nameLower = child.Name:lower()
@@ -1685,13 +1673,11 @@ local AntiBlind = (function()
     local function setupHook()
         if hooked then return true end
         
-        -- Находим все ремоуты ослепления
         local blindRemotes = findBlindRemotes()
         if #blindRemotes == 0 then
             return false
         end
         
-        -- Хукаем метатаблицу для перехвата FireServer
         mt = getrawmetatable(game)
         if not mt then return false end
         
@@ -1705,24 +1691,21 @@ local AntiBlind = (function()
         mt.__namecall = newcclosure(function(self, ...)
             local method = getnamecallmethod()
             
-            -- Блокируем FireServer для ремоутов ослепления
             if method == "FireServer" and isAntiBlindEnabled and isKillerTeam() then
                 local remoteName = tostring(self)
                 local remoteNameLower = remoteName:lower()
                 
-                -- Проверяем, является ли это ремоутом ослепления
                 for _, blindRemote in ipairs(blindRemotes) do
                     if self == blindRemote then
-                        return nil -- Блокируем вызов
+                        return nil -- block 
                     end
                 end
                 
-                -- Дополнительная проверка по имени
                 if remoteNameLower:find("blind") or 
                    remoteNameLower:find("flash") or 
                    remoteNameLower:find("gotblinded") or
                    remoteNameLower:find("blinded") then
-                    return nil -- Блокируем вызов
+                    return nil 
                 end
             end
             
@@ -1833,7 +1816,7 @@ local AntiBlind = (function()
     }
 end)()
 
--- ========== NO PALLET STUN ==========
+-- == NO PALLET STUN == --
 
 local NoPalletStun = (function()
     local enabled = false
@@ -1848,7 +1831,6 @@ local NoPalletStun = (function()
             return stunRemote, stunOverRemote
         end
         
-        -- Получаем ремоуты с обработкой ошибок
         local success1, result1 = pcall(function()
             return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
                 :WaitForChild("Pallet", 5)
@@ -1889,7 +1871,6 @@ local NoPalletStun = (function()
             return false
         end
         
-        -- Получаем метатаблицу и сохраняем оригинальный __namecall
         mt = getrawmetatable(stunRemoteFound)
         if not mt then return false end
         
@@ -1900,16 +1881,12 @@ local NoPalletStun = (function()
             setreadonly(mt, false)
         end
         
-        -- Перехватываем вызов FireServer для Stun ремоута
         mt.__namecall = newcclosure(function(self, ...)
             local method = getnamecallmethod()
             
-            -- Если это вызов FireServer для Stun ремоута и функция включена
             if self == stunRemoteFound and method == "FireServer" and enabled and isKillerTeam() then
-                -- Сначала вызываем оригинальный FireServer
                 local result = originalNamecall(self, ...)
                 
-                -- Затем сразу вызываем stunover
                 task.spawn(function()
                     callStunOver()
                 end)
@@ -1917,7 +1894,6 @@ local NoPalletStun = (function()
                 return result
             end
             
-            -- Для всех остальных случаев вызываем оригинальный метод
             return originalNamecall(self, ...)
         end)
         
@@ -1953,7 +1929,6 @@ local NoPalletStun = (function()
     local function updateNoPalletStun()
         if enabled and isKillerTeam() then
             if not setupHook() then
-                -- Пытаемся настроить хук с задержкой
                 task.spawn(function()
                     for i = 1, 5 do
                         task.wait(1)
@@ -1975,7 +1950,6 @@ local NoPalletStun = (function()
         enabled = true
         Nexus.States.NoPalletStunEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
@@ -1988,10 +1962,8 @@ local NoPalletStun = (function()
         
         teamListeners = {}
         
-        -- Добавляем слушатель изменения команды
         table.insert(teamListeners, setupTeamListener(updateNoPalletStun))
         
-        -- Обновляем состояние
         updateNoPalletStun()
     end
     
@@ -2002,7 +1974,6 @@ local NoPalletStun = (function()
         
         removeHook()
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
@@ -2028,6 +1999,7 @@ local NoPalletStun = (function()
         end
     }
 end)()
+
 -- ========== MASK POWERS ==========
 
 local function activateMaskPower(maskName)
@@ -2048,7 +2020,7 @@ local function activateMaskPower(maskName)
     return success and result
 end
 
--- ========== MODULE INITIALIZATION ==========
+-- TOGGLE FUNCTIONS --
 
 function Killer.Init(nxs)
     Nexus = nxs
@@ -2291,8 +2263,6 @@ function Killer.Init(nxs)
         end
     end)
 end
-
--- ========== CLEANUP ==========
 
 function Killer.Cleanup()
     
