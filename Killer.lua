@@ -7,8 +7,6 @@ local Killer = {
     HitboxCache = {}
 }
 
--- ========== UTILITY FUNCTIONS ==========
-
 local function isKillerTeam()
     local player = Nexus.Player
     if not player then return false end
@@ -35,7 +33,7 @@ local function setupTeamListener(callback)
     return {teamChangedConn, charAddedConn}
 end
 
--- ========== USE FAKE SAW ==========
+-- FAKE SAW --
 
 local UseFakeSaw = (function()
     local enabled = false
@@ -143,7 +141,7 @@ local UseFakeSaw = (function()
     }
 end)()
 
--- ========== SPEAR CROSSHAIR ==========-- 
+-- SPEAR CROSSHAIR - -
 
 local SpearCrosshair = (function()
     local enabled = false
@@ -468,211 +466,6 @@ local DoubleTap = (function()
         enabled = false
         Nexus.States.DoubleTapEnabled = false
         
-        removeHook()
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Nexus.safeDisconnect(conn)
-                end
-            else
-                Nexus.safeDisconnect(listener)
-            end
-        end
-        teamListeners = {}
-    end
-    
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end
-    }
-end)()
-
--- ========== SPAM HOOK ==========
-
-local SpamHook = (function()
-    local enabled = false
-    local spamCount = 0
-    local maxSpam = 100
-    local hooked = false
-    local originalNamecall = nil
-    local mt = nil
-    local teamListeners = {}
-    
-    local function GetHookEventRemote()
-        local success, result = pcall(function()
-            return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Carry"):WaitForChild("HookEvent")
-        end)
-        return success and result or nil
-    end
-    
-    local function findNearestSurvivor()
-        local character = Nexus.getCharacter()
-        if not character or not character:FindFirstChild("HumanoidRootPart") then
-            return nil
-        end
-        
-        local myPosition = character.HumanoidRootPart.Position
-        local nearestPlayer = nil
-        local nearestDistance = math.huge
-        
-        for _, player in pairs(Nexus.Services.Players:GetPlayers()) do
-            if player ~= Nexus.Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local team = player.Team
-                if team and team.Name == "Survivor" then
-                    local distance = (player.Character.HumanoidRootPart.Position - myPosition).Magnitude
-                    if distance < nearestDistance and distance < 50 then
-                        nearestDistance = distance
-                        nearestPlayer = player
-                    end
-                end
-            end
-        end
-        
-        return nearestPlayer
-    end
-    
-    local function executeHookSpam()
-        if not enabled or not isKillerTeam() then return end
-        
-        spamCount = 0
-        
-        for i = 1, maxSpam do
-            if not enabled or not isKillerTeam() then break end
-            
-            local target = findNearestSurvivor()
-            if target and target.Character then
-                local success = pcall(function()
-                    local hookEvent = GetHookEventRemote()
-                    if hookEvent then
-                        hookEvent:FireServer(target.Character)
-                    end
-                end)
-                
-                if success then
-                    spamCount = spamCount + 1
-                end
-            end
-        end
-    end
-    
-    local function setupHook()
-        if hooked then return end
-        
-        local hookEvent = GetHookEventRemote()
-        if not hookEvent then
-            return false
-        end
-        
-        mt = getrawmetatable(hookEvent)
-        if not mt then
-            return false
-        end
-        
-        originalNamecall = mt.__namecall
-        
-        local wasReadonly = isreadonly and isreadonly(mt)
-        if setreadonly then
-            setreadonly(mt, false)
-        end
-        
-        mt.__namecall = newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            
-            if self == hookEvent and method == "FireServer" and enabled and isKillerTeam() and spamCount < maxSpam then
-                local args = {...}
-                
-                originalNamecall(self, unpack(args))
-                
-                spamCount = spamCount + 1
-                
-                if enabled and isKillerTeam() and spamCount < maxSpam then
-                    originalNamecall(self, unpack(args))
-                    spamCount = spamCount + 1
-                end
-                
-                return
-            end
-            
-            return originalNamecall(self, ...)
-        end)
-        
-        if setreadonly and wasReadonly then
-            setreadonly(mt, true)
-        end
-        
-        hooked = true
-        return true
-    end
-    
-    local function removeHook()
-        if not hooked or not mt or not originalNamecall then return end
-        
-        local wasReadonly = isreadonly and isreadonly(mt)
-        if setreadonly then
-            setreadonly(mt, false)
-        end
-        
-        mt.__namecall = originalNamecall
-        
-        if setreadonly and wasReadonly then
-            setreadonly(mt, true)
-        end
-        
-        hooked = false
-        originalNamecall = nil
-        mt = nil
-        spamCount = 0
-    end
-    
-    local function updateSpamHook()
-        if enabled and isKillerTeam() then
-            if not setupHook() then
-                task.spawn(function()
-                    task.wait(2)
-                    if enabled and isKillerTeam() then
-                        setupHook()
-                    end
-                end)
-            end
-            
-            task.spawn(executeHookSpam)
-        elseif enabled then
-            removeHook()
-        else
-            removeHook()
-        end
-    end
-    
-    local function Enable()
-        if enabled then return end
-        enabled = true
-        Nexus.States.SpamHookEnabled = true
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Nexus.safeDisconnect(conn)
-                end
-            else
-                Nexus.safeDisconnect(listener)
-            end
-        end
-        
-        teamListeners = {}
-        
-        table.insert(teamListeners, setupTeamListener(updateSpamHook))
-        
-        updateSpamHook()
-    end
-    
-    local function Disable()
-        if not enabled then return end
-        enabled = false
-        Nexus.States.SpamHookEnabled = false
-        
-        spamCount = 0
         removeHook()
         
         for _, listener in ipairs(teamListeners) do
@@ -2404,22 +2197,6 @@ function Killer.Init(nxs)
             end
         end)
     end)
-
-    local SpamHookToggle = Tabs.Killer:AddToggle("SpamHook", {
-        Title = "Spam Hook", 
-        Description = "You can kill a survivor with one hook hit (and still farm the reward)", 
-        Default = false
-    })
-
-    SpamHookToggle:OnChanged(function(v)
-        Nexus.SafeCallback(function()
-            if v then 
-                SpamHook.Enable() 
-            else 
-                SpamHook.Disable() 
-            end
-        end)
-    end)
     
     local BeatGameToggle = Tabs.Killer:AddToggle("BeatGame", {
         Title = "Beat Game (Killer)", 
@@ -2454,7 +2231,7 @@ function Killer.Init(nxs)
     end)
     
     local AbysswalkerCorruptToggle = Tabs.Killer:AddToggle("AbysswalkerCorrupt", {
-        Title = "Abysswalker Corrupt [NO CD]",
+        Title = "Abysswalker Corrupt NO CD",
         Description = "no cooldown",
         Default = false
     })
@@ -2527,7 +2304,6 @@ function Killer.Cleanup()
     ThirdPerson.Disable()
     NoPalletStun.Disable()
     DoubleTap.Disable()      
-    SpamHook.Disable()  
     BeatGameKiller.Disable()
     AbysswalkerCorrupt.Disable()
     UseFakeSaw.Disable() 
