@@ -5,8 +5,6 @@ local Survivor = {
     States = {}
 }
 
--- ========== UTILITY FUNCTIONS ==========
-
 local function isSurvivorTeam()
     local player = Nexus.Player
     if not player then return false end
@@ -18,25 +16,21 @@ local function isSurvivorTeam()
 end
 
 local function setupTeamListener(callback)
-    -- Отслеживаем смену команды
+
     local teamChangedConn = Nexus.Player:GetPropertyChangedSignal("Team"):Connect(callback)
     
-    -- Отслеживаем вход в игру
     local function onCharacterAdded(character)
-        task.wait(0.5) -- Ждем загрузку персонажа
+        task.wait(0.5) 
         callback()
     end
     
     local charAddedConn = Nexus.Player.CharacterAdded:Connect(onCharacterAdded)
     
-    -- Первоначальный вызов
     task.spawn(callback)
     
-    -- Возвращаем соединения для очистки
     return {teamChangedConn, charAddedConn}
 end
 
--- ========== CROSSHAIR SYSTEM ==========
 
 local Crosshair = (function()
     local enabled = false
@@ -47,7 +41,6 @@ local Crosshair = (function()
     local rainbowConnection = nil
     local teamListeners = {}
     
-    -- Настройки прицелов
     local crosshairTypes = {
         crosshair = {
             create = function(parent)
@@ -57,8 +50,7 @@ local Crosshair = (function()
                 container.Size = UDim2.new(0, 20, 0, 20)
                 container.Position = UDim2.new(0.5, -10, 0.5, -10)
                 container.ZIndex = 999
-                
-                -- Вертикальная линия
+
                 local line1 = Instance.new("Frame")
                 line1.Name = "Line1"
                 line1.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -67,7 +59,6 @@ local Crosshair = (function()
                 line1.Position = UDim2.new(0.5, -1, 0.5, -6)
                 line1.Parent = container
                 
-                -- Горизонтальная линия
                 local line2 = Instance.new("Frame")
                 line2.Name = "Line2"
                 line2.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -161,7 +152,6 @@ local Crosshair = (function()
         
         if not enabled then return end
         
-        -- Создаем ScreenGui если его нет
         if not screenGui or not screenGui.Parent then
             screenGui = Instance.new("ScreenGui")
             screenGui.Name = "NexusCrosshair"
@@ -171,7 +161,6 @@ local Crosshair = (function()
             screenGui.Parent = Nexus.Player:WaitForChild("PlayerGui")
         end
         
-        -- Создаем выбранный тип прицела
         local crosshairConfig = crosshairTypes[currentType]
         if crosshairConfig then
             frame = crosshairConfig.create(screenGui)
@@ -196,10 +185,9 @@ local Crosshair = (function()
             if not frame or not rainbowEnabled then return end
             
             local time = tick()
-            local hue = (time % 5) / 5  -- 5 секундный цикл
+            local hue = (time % 5) / 5  
             local color = Color3.fromHSV(hue, 1, 1)
             
-            -- Обновляем цвет в зависимости от типа прицела
             if currentType == "crosshair" then
                 local line1 = frame:FindFirstChild("Line1")
                 local line2 = frame:FindFirstChild("Line2")
@@ -216,7 +204,6 @@ local Crosshair = (function()
     end
     
     local function updateCrosshairState()
-        -- Crosshair работает независимо от команды, всегда
         if enabled then
             createCrosshair()
             updateRainbowEffect()
@@ -231,7 +218,6 @@ local Crosshair = (function()
         Nexus.States.CrosshairEnabled = true
         print("Crosshair: ON")
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
@@ -243,11 +229,9 @@ local Crosshair = (function()
         end
         
         teamListeners = {}
-        
-        -- Создаем слушатель для обновления состояния
+    
         table.insert(teamListeners, setupTeamListener(updateCrosshairState))
         
-        -- Инициализируем состояние
         updateCrosshairState()
     end
     
@@ -258,13 +242,11 @@ local Crosshair = (function()
         Nexus.States.RainbowCrosshairEnabled = false
         print("Crosshair: OFF")
         
-        -- Останавливаем радужный эффект
         if rainbowConnection then
             rainbowConnection:Disconnect()
             rainbowConnection = nil
         end
         
-        -- Восстанавливаем белый цвет прицела
         if frame then
             if currentType == "crosshair" then
                 local line1 = frame:FindFirstChild("Line1")
@@ -287,7 +269,6 @@ local Crosshair = (function()
             screenGui = nil
         end
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
@@ -319,7 +300,6 @@ local Crosshair = (function()
         print("Rainbow Crosshair: " .. (value and "ON" or "OFF"))
         
         if not value and frame then
-            -- При выключении радуги восстанавливаем белый цвет
             if currentType == "crosshair" then
                 local line1 = frame:FindFirstChild("Line1")
                 local line2 = frame:FindFirstChild("Line2")
@@ -349,8 +329,6 @@ local Crosshair = (function()
         IsRainbowEnabled = function() return rainbowEnabled end
     }
 end)()
-
--- TWIST SILENT AIM --
 
 local TwistSilentAim = (function()
     local enabled = false
