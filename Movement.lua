@@ -1,4 +1,3 @@
--- Movement Module - Movement functions for Violence District
 local Nexus = _G.Nexus
 
 local Movement = {
@@ -23,7 +22,6 @@ local Movement = {
     }
 }
 
--- ========== HELPER FUNCTIONS ==========
 
 function Movement.GetCharacter()
     return Nexus.Player.Character
@@ -39,7 +37,7 @@ function Movement.GetRootPart()
     return char and char:FindFirstChild("HumanoidRootPart")
 end
 
--- ========== WALKSPEED ==========
+-- WALK SPEED --
 
 local WalkSpeed = (function()
     local WALKSPEED_ENABLED = false
@@ -115,7 +113,7 @@ local WalkSpeed = (function()
     }
 end)()
 
--- ========== NOCLIP ==========
+-- NO CLIP --
 
 local NoClip = (function()
     local noclipEnabled = false
@@ -209,7 +207,7 @@ local NoClip = (function()
     }
 end)()
 
--- ========== FLY ==========
+-- FLY --
 
 local function enableFly()
     if Movement.States.FlyEnabled then return end
@@ -297,7 +295,7 @@ local function disableFly()
     end
 end
 
--- ========== FREE CAMERA ==========
+-- FREE CAMERA --
 
 local function lockMouse()
     if not Movement.States.FreeCameraEnabled then return end
@@ -411,7 +409,7 @@ local function stopFreeCamera()
     end
 end
 
--- ========== INFINITE LUNGE ==========
+-- INFINITE LUNGE --
 
 local InfiniteLunge = (function()
     local isLunging = false
@@ -493,7 +491,7 @@ local InfiniteLunge = (function()
     }
 end)()
 
--- ========== FOV SYSTEM ==========
+-- FOV SYSTEM --
 
 local function ApplyFOV()
     local camera = Nexus.Camera
@@ -517,15 +515,12 @@ local function ApplyFOV()
     end
 end
 
--- ========== MODULE INITIALIZATION ==========
-
 function Movement.Init(nxs)
     Nexus = nxs
     
     local Tabs = Nexus.Tabs
     local Options = Nexus.Options
     
-    -- Setup FOV system
     Nexus.Services.Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
         task.wait(0.1)
         Nexus.Camera = Nexus.Services.Workspace.CurrentCamera
@@ -540,8 +535,9 @@ function Movement.Init(nxs)
             end
         end)
     end
+
+   -- TOGGLE FUNCTIONS -- 
     
-    -- ========== INFINITE LUNGE ==========
     if Nexus.IS_DESKTOP then
         local InfiniteLungeToggle = Tabs.Movement:AddToggle("InfiniteLunge", {
             Title = "Infinite Lunge", 
@@ -573,8 +569,7 @@ function Movement.Init(nxs)
             end
         })
     end
-
-    -- ========== WALK SPEED ==========
+    
     local WalkSpeedToggle = Tabs.Movement:AddToggle("WalkSpeed", {
         Title = "Walk Speed", 
         Description = "", 
@@ -605,7 +600,6 @@ function Movement.Init(nxs)
         end
     })
 
-    -- ========== NOCLIP ==========
     local NoclipToggle = Tabs.Movement:AddToggle("Noclip", {
         Title = "Noclip",
         Description = "",
@@ -622,7 +616,6 @@ function Movement.Init(nxs)
         end)
     end)
 
-    -- ========== FOV CHANGER ==========
     local FOVToggle = Tabs.Movement:AddToggle("FOVChanger", {
         Title = "FOV Changer", 
         Description = "", 
@@ -651,7 +644,6 @@ function Movement.Init(nxs)
         end
     })
 
-    -- ========== FLY ==========
     if Nexus.IS_DESKTOP then
         local FlyToggle = Tabs.Movement:AddToggle("Fly", {
             Title = "Fly", 
@@ -683,7 +675,6 @@ function Movement.Init(nxs)
             end
         })
 
-        -- ========== FREE CAMERA ==========
         local FreeCameraToggle = Tabs.Movement:AddToggle("FreeCamera", {
             Title = "Free Camera", 
             Description = "", 
@@ -716,10 +707,9 @@ function Movement.Init(nxs)
     end
 end
 
--- ========== CLEANUP ==========
 
 function Movement.Cleanup()
-    -- Отключаем все функции
+    
     InfiniteLunge.Disable()
     WalkSpeed.Disable()
     NoClip.Disable()
@@ -727,13 +717,11 @@ function Movement.Cleanup()
     stopFreeCamera()
     Movement.Settings.fovEnabled = false
     
-    -- Восстанавливаем FOV
     local camera = Nexus.Camera
     if camera then
         camera.FieldOfView = 50
     end
     
-    -- Очищаем объекты
     if Movement.Objects.bodyVelocity then 
         Movement.Objects.bodyVelocity:Destroy()
         Movement.Objects.bodyVelocity = nil 
@@ -743,7 +731,6 @@ function Movement.Cleanup()
         Movement.Objects.bodyGyro = nil 
     end
     
-    -- Отключаем все соединения
     for key, connection in pairs(Movement.Connections) do
         Nexus.safeDisconnect(connection)
     end
