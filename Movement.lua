@@ -535,8 +535,6 @@ function Movement.Init(nxs)
             end
         end)
     end
-
-   -- TOGGLE FUNCTIONS -- 
     
     if Nexus.IS_DESKTOP then
         local InfiniteLungeToggle = Tabs.Movement:AddToggle("InfiniteLunge", {
