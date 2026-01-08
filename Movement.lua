@@ -493,28 +493,20 @@ end)()
 
 -- FOV SYSTEM --
 
-local function ApplyFOV(useTween)
+local function ApplyFOV()
     local camera = Nexus.Camera
-    if not camera then return end
-    
-    if Movement.Settings.fovEnabled then
-        local targetFOV = math.max(1, Movement.Settings.fovValue)
-        Movement.Settings.fovTargetValue = targetFOV
+    if camera and Movement.Settings.fovEnabled then
+        Movement.Settings.fovTargetValue = Movement.Settings.fovValue
         
         if Movement.Objects.currentTween then
             Movement.Objects.currentTween:Cancel()
-            Movement.Objects.currentTween = nil
         end
         
-        if useTween then
-            Movement.Objects.currentTween = Nexus.Services.TweenService:Create(camera, 
-                TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
-                {FieldOfView = targetFOV})
-            Movement.Objects.currentTween:Play()
-        else
-            camera.FieldOfView = targetFOV
-        end
-    else
+        Movement.Objects.currentTween = Nexus.Services.TweenService:Create(camera, 
+            TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {FieldOfView = Movement.Settings.fovTargetValue})
+        Movement.Objects.currentTween:Play()
+    elseif camera then
         if Movement.Objects.currentTween then
             Movement.Objects.currentTween:Cancel()
             Movement.Objects.currentTween = nil
@@ -532,14 +524,14 @@ function Movement.Init(nxs)
     Nexus.Services.Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
         task.wait(0.1)
         Nexus.Camera = Nexus.Services.Workspace.CurrentCamera
-        ApplyFOV(false)
+        ApplyFOV()
     end)
 
     if Nexus.Services.RunService.RenderStepped then
         Movement.Connections.FOVUpdater = Nexus.Services.RunService.RenderStepped:Connect(function()
             if Movement.Settings.fovEnabled and Nexus.Camera then
                 local targetFOV = math.max(1, Movement.Settings.fovTargetValue or 70)
-                if math.abs(Nexus.Camera.FieldOfView - targetFOV) > 1 then
+                if Nexus.Camera.FieldOfView ~= targetFOV then
                     Nexus.Camera.FieldOfView = targetFOV
                 end
             end
@@ -633,21 +625,21 @@ function Movement.Init(nxs)
     FOVToggle:OnChanged(function(v)
         Nexus.SafeCallback(function()
             Movement.Settings.fovEnabled = v
-            ApplyFOV(true)
+            ApplyFOV()
         end)
     end)
 
     local FOVSlider = Tabs.Movement:AddSlider("FOVValue", {
         Title = "FOV Value", 
-        Description = "1-120",
+        Description = "0-120",
         Default = 95,
-        Min = 1,
+        Min = 0,
         Max = 120,
         Rounding = 0,
         Callback = function(value)
             Nexus.SafeCallback(function()
-                Movement.Settings.fovValue = math.max(1, value)
-                ApplyFOV(false)
+                Movement.Settings.fovValue = value
+                ApplyFOV()
             end)
         end
     })
