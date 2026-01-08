@@ -882,8 +882,6 @@ end)()
 
 -- AUTO PARRY --
 
--- AUTO PARRY с динамическим обнаружением анимации lungehold --
-
 local AutoParry = (function()
     local spamActive = false
     local RANGE = 10
