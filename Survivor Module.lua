@@ -1688,9 +1688,8 @@ local GateTool = (function()
     return {Enable=Enable, Disable=Disable}
 end)()
 
--- AUTO PERFECT SKILL -- (GENERATOR)
+-- ========== AUTO PERFECT SKILL ==========
 
-local AutoPerfectSkill = (function()
 local AutoPerfectSkill = (function()
     local connection = nil
     local teamListeners = {}
@@ -1742,9 +1741,6 @@ local AutoPerfectSkill = (function()
         if Nexus.States.autoSkillEnabled and isSurvivorTeam() then
             connection = Nexus.Services.RunService.Heartbeat:Connect(PerformPerfectSkillCheck)
             DisableGeneratorFail()
-            print("Auto Perfect Skill: Activated for Survivor team")
-        elseif Nexus.States.autoSkillEnabled then
-            print("Auto Perfect Skill: Waiting for Survivor team...")
         end
     end
 
@@ -1752,7 +1748,6 @@ local AutoPerfectSkill = (function()
         if Nexus.States.autoSkillEnabled then return end
         Nexus.States.autoSkillEnabled = true
         
-        -- Очищаем старые слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
@@ -1765,10 +1760,8 @@ local AutoPerfectSkill = (function()
         
         teamListeners = {}
         
-        -- Добавляем слушатель смены команды
         table.insert(teamListeners, setupTeamListener(updateAutoSkill))
         
-        -- Инициализируем состояние
         updateAutoSkill()
     end
 
@@ -1780,7 +1773,6 @@ local AutoPerfectSkill = (function()
             connection = nil
         end
         
-        -- Очищаем слушатели
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
