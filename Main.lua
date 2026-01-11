@@ -142,7 +142,7 @@ _G.Nexus.Clamp = function(value, min, max)
 end
 
 local function createUI()
-    local windowSize = _G.Nexus.IS_MOBILE and UDim2.fromOffset(350, 200) or UDim2.fromOffset(580,550)
+    local windowSize = _G.Nexus.IS_MOBILE and UDim2.fromOffset(350, 200) or UDim2.fromOffset(470,567)
     
     _G.Nexus.Window = Fluent:CreateWindow({
         Title = "NEXUS",
@@ -153,12 +153,12 @@ local function createUI()
         Size = windowSize,  
         Acrylic = false,
         Theme = "AMOLED",
-        MinimizeKey = Enum.KeyCode.LeftControl,
+        MinimizeKey = Enum.KeyCode.LeftAlt,
         UserInfo = true,
         UserInfoTop = false,
         UserInfoTitle = _G.Nexus.Player.DisplayName,
-        UserInfoSubtitle = "user",
-        UserInfoSubtitleColor = Color3.fromRGB(255, 250, 250)
+        UserInfoSubtitle = "Free Plan",
+        UserInfoSubtitleColor = Color3.fromRGB(1,177,252)
     })
 
     _G.Nexus.Tabs = {}
