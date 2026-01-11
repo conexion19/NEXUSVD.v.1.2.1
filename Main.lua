@@ -157,7 +157,7 @@ local function createUI()
         UserInfoTop = false,
         UserInfoTitle = _G.Nexus.Player.DisplayName,
         UserInfoSubtitle = "Free Plan",
-        UserInfoSubtitleColor = Color3.fromRGB(12,0,255)
+        UserInfoSubtitleColor = Color3.fromRGB(255, 255, 255)
     })
 
     _G.Nexus.Tabs = {}
