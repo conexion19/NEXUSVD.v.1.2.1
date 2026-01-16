@@ -1,4 +1,3 @@
-print("rw")
 local Nexus = _G.Nexus
 
 local Movement = {
@@ -525,38 +524,6 @@ function Movement.Init(nxs)
             Nexus.Camera.FieldOfView = targetFOV
         end
     end)
-    
-    if Nexus.IS_DESKTOP then
-        local InfiniteLungeToggle = Tabs.Movement:AddToggle("InfiniteLunge", {
-            Title = "Infinite Lunge", 
-            Description = "Hold LMB to lunge forward", 
-            Default = false
-        })
-
-        InfiniteLungeToggle:OnChanged(function(v) 
-            Nexus.SafeCallback(function()
-                if v then 
-                    InfiniteLunge.Enable() 
-                else 
-                    InfiniteLunge.Disable() 
-                end 
-            end)
-        end)
-
-        local LungeSpeedSlider = Tabs.Movement:AddSlider("LungeSpeed", {
-            Title = "Lunge Speed", 
-            Description = "", 
-            Default = 50, 
-            Min = 10, 
-            Max = 200, 
-            Rounding = 0, 
-            Callback = function(value) 
-                Nexus.SafeCallback(function()
-                    InfiniteLunge.SetSpeed(value)
-                end)
-            end
-        })
-    end
     
     local WalkSpeedToggle = Tabs.Movement:AddToggle("WalkSpeed", {
         Title = "Walk Speed", 
