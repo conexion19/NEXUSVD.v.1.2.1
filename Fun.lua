@@ -229,17 +229,7 @@ function Fun.StartJerk()
         end
 
         if Fun.JerkTool.tool and Fun.JerkTool.tool.Parent then
-            if Fun.JerkTool.active then
-                Fun.JerkTool.active = false
-                if Fun.JerkTool.track then
-                    Fun.JerkTool.track:Stop()
-                    Fun.JerkTool.track = nil
-                end
-                return
-            else
-                Fun.JerkTool.active = true
-                return
-            end
+            return
         end
 
         local tool = Instance.new("Tool")
@@ -248,10 +238,7 @@ function Fun.StartJerk()
         tool.RequiresHandle = false
         tool.Parent = backpack
 
-        local humanoidRootPart = Nexus.getCharacter():WaitForChild("HumanoidRootPart")
-
         Fun.JerkTool.tool = tool
-        Fun.JerkTool.active = true
 
         local function stopAnimation()
             if Fun.JerkTool.track then
@@ -262,8 +249,6 @@ function Fun.StartJerk()
         end
 
         local function startAnimation()
-            if not Fun.JerkTool.active then return end
-            
             local currentHumanoid = Nexus.getHumanoid()
             if not currentHumanoid or currentHumanoid.Health <= 0 then return end
             
@@ -291,12 +276,52 @@ function Fun.StartJerk()
             end
         end
 
+        local animationLoopTask
+        local function startAnimationLoop()
+            if animationLoopTask then return end
+            
+            animationLoopTask = task.spawn(function()
+                while Fun.JerkTool.active do
+                    if not Fun.JerkTool.tool or not Fun.JerkTool.tool.Parent then
+                        break
+                    end
+                    
+                    local currentHumanoid = Nexus.getHumanoid()
+                    if not currentHumanoid or currentHumanoid.Health <= 0 then
+                        break
+                    end
+                    
+                    startAnimation()
+                    
+                    local function isR15()
+                        local character = Nexus.getCharacter()
+                        if not character then return false end
+                        local hum = character:FindFirstChildOfClass("Humanoid")
+                        if not hum then return false end
+                        return hum.RigType == Enum.HumanoidRigType.R15
+                    end
+                    
+                    local r15 = isR15()
+                    
+                    task.wait(0.5)
+                    
+                    while Fun.JerkTool.active and Fun.JerkTool.track do
+                        if not Fun.JerkTool.tool or not Fun.JerkTool.tool.Parent then
+                            break
+                        end
+                        task.wait(0.1)
+                    end
+                end
+                animationLoopTask = nil
+            end)
+        end
+
         tool.Activated:Connect(function()
             if Fun.JerkTool.active then
                 stopAnimation()
             else
                 Fun.JerkTool.active = true
-                startAnimation()
+                startAnimationLoop()
             end
         end)
 
@@ -310,8 +335,10 @@ function Fun.StartJerk()
 
         local characterAddedConnection = Nexus.Player.CharacterAdded:Connect(function()
             task.wait(1)
+            stopAnimation()
             if Fun.JerkTool.tool and Fun.JerkTool.tool.Parent then
-                stopAnimation()
+                Fun.JerkTool.tool:Destroy()
+                Fun.JerkTool.tool = nil
             end
         end)
 
@@ -327,6 +354,9 @@ function Fun.StartJerk()
                 end
                 if characterAddedConnection then
                     characterAddedConnection:Disconnect()
+                end
+                if animationLoopTask then
+                    animationLoopTask = nil
                 end
                 if tool == Fun.JerkTool.tool then
                     Fun.JerkTool.tool = nil
@@ -346,6 +376,8 @@ function Fun.StopJerk()
         Fun.JerkTool.track = nil
     end
     
+    Fun.JerkTool.active = false
+    
     if Fun.JerkTool.tool then
         local deathConnection = Fun.JerkTool.tool:GetAttribute("DeathConnection")
         local removalConnection = Fun.JerkTool.tool:GetAttribute("RemovalConnection")
@@ -364,8 +396,6 @@ function Fun.StopJerk()
         Fun.JerkTool.tool:Destroy()
         Fun.JerkTool.tool = nil
     end
-    
-    Fun.JerkTool.active = false
 end
 
 function Fun.ResetCharacter()
