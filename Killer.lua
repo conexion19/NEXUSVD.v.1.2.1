@@ -2000,11 +2000,12 @@ local NoPalletStun = (function()
     }
 end)()
 
--- SPEAR AIM BOT --
+-- SPEAR AIMBOT --
 
 local SpearAimBot = (function()
     local enabled = false
-    local hooked = false
+    local active = true
+    local isFiring = false
     local oldNamecall = nil
     local remote = nil
     local teamListeners = {}
@@ -2012,7 +2013,7 @@ local SpearAimBot = (function()
     local function GetClosestPlayer()
         local closestPlayer = nil
         local closestDistance = math.huge
-        local myPos = Nexus.Services.Workspace.CurrentCamera.CFrame.Position
+        local myPos = workspace.CurrentCamera.CFrame.Position
         
         for _, player in pairs(Nexus.Services.Players:GetPlayers()) do
             if player ~= Nexus.Player and player.Character then
@@ -2030,7 +2031,7 @@ local SpearAimBot = (function()
         return closestPlayer
     end
     
-    local function getSpearThrowRemote()
+    local function getSpearRemote()
         local success, result = pcall(function()
             return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Veil"):WaitForChild("Spearthrow")
         end)
@@ -2038,25 +2039,15 @@ local SpearAimBot = (function()
     end
     
     local function setupHook()
-        if hooked then return true end
+        if oldNamecall then return end
         
-        remote = getSpearThrowRemote()
+        remote = getSpearRemote()
         if not remote then return false end
         
-        local mt = getrawmetatable(game)
-        if not mt then return false end
-        
-        oldNamecall = mt.__namecall
-        
-        local wasReadonly = isreadonly and isreadonly(mt)
-        if setreadonly then
-            setreadonly(mt, false)
-        end
-        
-        mt.__namecall = newcclosure(function(self, ...)
+        oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
             local method = getnamecallmethod()
             
-            if method == "FireServer" and self == remote and enabled and isKillerTeam() then
+            if method == "FireServer" and self == remote and enabled and active and not isFiring then
                 local direction, num = ...
                 
                 if direction and typeof(direction) == "Vector3" and num then
@@ -2064,58 +2055,34 @@ local SpearAimBot = (function()
                     if target and target.Character then
                         local targetPart = target.Character:FindFirstChild("HumanoidRootPart")
                         if targetPart then
-                            local cameraPos = Nexus.Services.Workspace.CurrentCamera.CFrame.Position
+                            local cameraPos = workspace.CurrentCamera.CFrame.Position
                             local newDirection = (targetPart.Position - cameraPos).Unit
-                            return oldNamecall(self, newDirection, num)
+                            print("[Spear AimBot] Targeted: " .. target.Name)
+                            isFiring = true
+                            remote:FireServer(newDirection, num)
+                            isFiring = false
+                            return nil
                         end
                     end
                 end
             end
             
             return oldNamecall(self, ...)
-        end)
+        end))
         
-        if setreadonly and wasReadonly then
-            setreadonly(mt, true)
-        end
-        
-        hooked = true
         return true
     end
     
     local function removeHook()
-        if not hooked or not oldNamecall then return end
-        
-        local mt = getrawmetatable(game)
-        if not mt then return end
-        
-        local wasReadonly = isreadonly and isreadonly(mt)
-        if setreadonly then
-            setreadonly(mt, false)
+        if oldNamecall then
+            oldNamecall = nil
         end
-        
-        mt.__namecall = oldNamecall
-        
-        if setreadonly and wasReadonly then
-            setreadonly(mt, true)
-        end
-        
-        hooked = false
-        oldNamecall = nil
-        remote = nil
     end
     
-    local function updateSpearAimBot()
+    local function updateSpearAimbotState()
         if enabled and isKillerTeam() then
-            if not setupHook() then
-                task.spawn(function()
-                    for i = 1, 5 do
-                        task.wait(1)
-                        if enabled and isKillerTeam() and not hooked then
-                            if setupHook() then break end
-                        end
-                    end
-                end)
+            if not oldNamecall then
+                setupHook()
             end
         else
             removeHook()
@@ -2125,7 +2092,7 @@ local SpearAimBot = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Nexus.States.SpearAimBotEnabled = true
+        Nexus.States.SpearAimbotEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
@@ -2139,15 +2106,15 @@ local SpearAimBot = (function()
         
         teamListeners = {}
         
-        table.insert(teamListeners, setupTeamListener(updateSpearAimBot))
+        table.insert(teamListeners, setupTeamListener(updateSpearAimbotState))
         
-        updateSpearAimBot()
+        updateSpearAimbotState()
     end
     
     local function Disable()
         if not enabled then return end
         enabled = false
-        Nexus.States.SpearAimBotEnabled = false
+        Nexus.States.SpearAimbotEnabled = false
         
         removeHook()
         
@@ -2166,9 +2133,34 @@ local SpearAimBot = (function()
     return {
         Enable = Enable,
         Disable = Disable,
-        IsEnabled = function() return enabled end
+        IsEnabled = function() return enabled end,
+        Toggle = function()
+            active = not active
+            print("[Spear AimBot] " .. (active and "ON" or "OFF"))
+            return active
+        end
     }
 end)()
+
+-- MASK POWERS --
+
+local function activateMaskPower(maskName)
+    local success, result = pcall(function()
+        if not isKillerTeam() then
+            return false
+        end
+        
+        local remotes = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes")
+        local killers = remotes:WaitForChild("Killers")
+        local masked = killers:WaitForChild("Masked")
+        local activatePower = masked:WaitForChild("Activatepower")
+        
+        activatePower:FireServer(maskName)
+        return true
+    end)
+    
+    return success and result
+end
 
 -- TOGGLE FUNCTIONS --
 
@@ -2384,18 +2376,18 @@ function Killer.Init(nxs)
         end)
     end)
 
-    local SpearAimBotToggle = Tabs.Killer:AddToggle("SpearAimBot", {
-        Title = "Spear AimBot", 
-        Description = "Automatically aims at closest player when throwing spear", 
+    local SpearAimbotToggle = Tabs.Killer:AddToggle("SpearAimbot", {
+        Title = "Spear AimBot (Veil)",
+        Description = "Automatically aim at the nearest survivor with spear",
         Default = false
     })
 
-    SpearAimBotToggle:OnChanged(function(v)
+    SpearAimbotToggle:OnChanged(function(v)
         Nexus.SafeCallback(function()
-            if v then 
-                SpearAimBot.Enable() 
-            else 
-                SpearAimBot.Disable() 
+            if v then
+                SpearAimBot.Enable()
+            else
+                SpearAimBot.Disable()
             end
         end)
     end)
