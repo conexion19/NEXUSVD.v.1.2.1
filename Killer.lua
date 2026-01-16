@@ -1816,7 +1816,7 @@ local AntiBlind = (function()
     }
 end)()
 
--- == NO PALLET STUN == --
+-- NO PALLET STUN --
 
 local NoPalletStun = (function()
     local enabled = false
@@ -2057,7 +2057,6 @@ local SpearAimBot = (function()
                         if targetPart then
                             local cameraPos = workspace.CurrentCamera.CFrame.Position
                             local newDirection = (targetPart.Position - cameraPos).Unit
-                            print("[Spear AimBot] Targeted: " .. target.Name)
                             isFiring = true
                             remote:FireServer(newDirection, num)
                             isFiring = false
@@ -2136,7 +2135,6 @@ local SpearAimBot = (function()
         IsEnabled = function() return enabled end,
         Toggle = function()
             active = not active
-            print("[Spear AimBot] " .. (active and "ON" or "OFF"))
             return active
         end
     }
@@ -2378,7 +2376,7 @@ function Killer.Init(nxs)
 
     local SpearAimbotToggle = Tabs.Killer:AddToggle("SpearAimbot", {
         Title = "Spear AimBot (Veil)",
-        Description = "Automatically aim at the nearest survivor with spear",
+        Description = "automatically aims a spear at the nearest Survivor when thrown",
         Default = false
     })
 
