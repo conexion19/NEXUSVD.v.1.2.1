@@ -224,7 +224,7 @@ function Fun.StartJerk()
             return 
         end
 
-        if Fun.JerkTool.tool then
+        if Fun.JerkTool.tool and Fun.JerkTool.tool.Parent then
             Fun.StopJerk()
         end
 
@@ -233,6 +233,9 @@ function Fun.StartJerk()
         tool.ToolTip = "Use tool to jerk off"
         tool.RequiresHandle = false
         tool.Parent = backpack
+        
+        local currentHumanoid = humanoid
+        local currentTool = tool
 
         Fun.JerkTool.tool = tool
         Fun.JerkTool.active = true
@@ -251,7 +254,49 @@ function Fun.StartJerk()
         
         tool.Unequipped:Connect(stopTomfoolery)
         
-        humanoid.Died:Connect(stopTomfoolery)
+        local deathConnection = currentHumanoid.Died:Connect(function()
+            stopTomfoolery()
+            if currentTool and currentTool.Parent then
+                currentTool:Destroy()
+            end
+        end)
+
+        local removalConnection
+        removalConnection = tool.AncestryChanged:Connect(function(_, parent)
+            if not parent then
+                stopTomfoolery()
+                if deathConnection then
+                    deathConnection:Disconnect()
+                end
+                if removalConnection then
+                    removalConnection:Disconnect()
+                end
+                if tool == Fun.JerkTool.tool then
+                    Fun.JerkTool.tool = nil
+                end
+            end
+        end)
+
+        local characterAddedConnection
+        characterAddedConnection = Nexus.Player.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            stopTomfoolery()
+            if currentTool and currentTool.Parent then
+                currentTool:Destroy()
+            end
+            if deathConnection then
+                deathConnection:Disconnect()
+            end
+            if removalConnection then
+                removalConnection:Disconnect()
+            end
+            if characterAddedConnection then
+                characterAddedConnection:Disconnect()
+            end
+            if tool == Fun.JerkTool.tool then
+                Fun.JerkTool.tool = nil
+            end
+        end)
 
         local function isR15()
             local character = Nexus.getCharacter()
@@ -263,32 +308,53 @@ function Fun.StartJerk()
         
         task.spawn(function()
             while task.wait() do
-                if not Fun.JerkTool.active then continue end
+                if not Fun.JerkTool.active then 
+                    task.wait(0.1)
+                    continue 
+                end
+                
+                if not Fun.JerkTool.tool or not Fun.JerkTool.tool.Parent then
+                    break
+                end
+                
+                local currentHumanoid = Nexus.getHumanoid()
+                if not currentHumanoid or currentHumanoid.Health <= 0 then
+                    break
+                end
                 
                 local r15 = isR15()
                 
                 if not Fun.JerkTool.track then
                     local anim = Instance.new("Animation")
                     anim.AnimationId = not r15 and "rbxassetid://72042024" or "rbxassetid://698251653"
-                    Fun.JerkTool.track = humanoid:LoadAnimation(anim)
+                    Fun.JerkTool.track = currentHumanoid:LoadAnimation(anim)
                 end
 
-                Fun.JerkTool.track:Play()
-                Fun.JerkTool.track:AdjustSpeed(r15 and 0.7 or 0.65)
-                Fun.JerkTool.track.TimePosition = 0.6
-                
-                task.wait(0.1)
-                
-                while Fun.JerkTool.track and Fun.JerkTool.track.TimePosition < (not r15 and 0.65 or 0.7) do 
-                    task.wait(0.1) 
-                end
-                
                 if Fun.JerkTool.track then
-                    Fun.JerkTool.track:Stop()
-                    Fun.JerkTool.track = nil
+                    Fun.JerkTool.track:Play()
+                    Fun.JerkTool.track:AdjustSpeed(r15 and 0.7 or 0.65)
+                    Fun.JerkTool.track.TimePosition = 0.6
+                    
+                    task.wait(0.1)
+                    
+                    while Fun.JerkTool.track and Fun.JerkTool.track.TimePosition < (not r15 and 0.65 or 0.7) do 
+                        if not Fun.JerkTool.active or not Fun.JerkTool.tool or not Fun.JerkTool.tool.Parent then
+                            break
+                        end
+                        task.wait(0.1) 
+                    end
+                    
+                    if Fun.JerkTool.track then
+                        Fun.JerkTool.track:Stop()
+                        Fun.JerkTool.track = nil
+                    end
                 end
             end
         end)
+        
+        tool:SetAttribute("DeathConnection", deathConnection)
+        tool:SetAttribute("RemovalConnection", removalConnection)
+        tool:SetAttribute("CharacterConnection", characterAddedConnection)
     end)
 end
 
@@ -299,6 +365,20 @@ function Fun.StopJerk()
     end
     
     if Fun.JerkTool.tool then
+        local deathConnection = Fun.JerkTool.tool:GetAttribute("DeathConnection")
+        local removalConnection = Fun.JerkTool.tool:GetAttribute("RemovalConnection")
+        local characterConnection = Fun.JerkTool.tool:GetAttribute("CharacterConnection")
+        
+        if deathConnection and deathConnection.Connected then
+            deathConnection:Disconnect()
+        end
+        if removalConnection and removalConnection.Connected then
+            removalConnection:Disconnect()
+        end
+        if characterConnection and characterConnection.Connected then
+            characterConnection:Disconnect()
+        end
+        
         Fun.JerkTool.tool:Destroy()
         Fun.JerkTool.tool = nil
     end
@@ -389,6 +469,10 @@ function Fun.Cleanup()
         Fun.SpinConnection:Disconnect()
         Fun.SpinConnection = nil
     end
+    
+    if Fun.JerkTool.tool then
+        Fun.StopJerk()
+    end
 end
 
-return Fun
+return Fun 
