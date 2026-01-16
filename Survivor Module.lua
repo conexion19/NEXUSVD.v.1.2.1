@@ -749,6 +749,94 @@ local AutoVictory = (function()
     }
 end)()
 
+-- AUTO VICTORY V2 (SURVIVOR) --
+
+local AutoVictoryV2 = (function()
+    local enabled = false
+    local eventFired = false
+    local teamListeners = {}
+    
+    local function getShowResultsEvent()
+        local success, event = pcall(function()
+            return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Game"):WaitForChild("showresults")
+        end)
+        return success and event or nil
+    end
+    
+    local function fireEventOnce()
+        if eventFired then return end
+        
+        local Event = getShowResultsEvent()
+        if Event then
+            pcall(function()
+                firesignal(Event.OnClientEvent)
+                eventFired = true
+            end)
+        else
+        end
+    end
+    
+    local function resetEventState()
+        eventFired = false
+    end
+    
+    local function updateAutoVictoryV2State()
+        if enabled and isSurvivorTeam() then
+            resetEventState()
+            fireEventOnce()
+        else
+            resetEventState()
+        end
+    end
+    
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.AutoVictoryV2Enabled = true
+        
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do
+                    Nexus.safeDisconnect(conn)
+                end
+            else
+                Nexus.safeDisconnect(listener)
+            end
+        end
+        
+        teamListeners = {}
+        
+        table.insert(teamListeners, setupTeamListener(updateAutoVictoryV2State))
+        
+        updateAutoVictoryV2State()
+    end
+    
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.AutoVictoryV2Enabled = false
+        
+        resetEventState()
+        
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do
+                    Nexus.safeDisconnect(conn)
+                end
+            else
+                Nexus.safeDisconnect(listener)
+            end
+        end
+        teamListeners = {}
+    end
+    
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end
+    }
+end)()
+
 -- NO SLOWDOWN --
 
 local NoSlowdown = (function()
@@ -2019,6 +2107,22 @@ function Survivor.Init(nxs)
         end)
     end)
 
+    local AutoVictoryV2Toggle = Tabs.Main:AddToggle("AutoVictoryV2", {
+        Title = "Auto Victory V2", 
+        Description = "", 
+        Default = false
+    })
+
+    AutoVictoryV2Toggle:OnChanged(function(v) 
+        Nexus.SafeCallback(function()
+            if v then 
+                AutoVictoryV2.Enable() 
+            else 
+                AutoVictoryV2.Disable() 
+            end 
+        end)
+    end)
+
     local NoSlowdownToggle = Tabs.Main:AddToggle("NoSlowdown", {
         Title = "No Slowdown&NoStun + FastDropPallet", 
         Description = "Prevents all slowdown effects", 
@@ -2234,6 +2338,7 @@ function Survivor.Cleanup()
 
     Crosshair.Disable()
     AutoVictory.Disable()
+    AutoVictoryV2.Disable()
     NoSlowdown.Disable()
     AutoParry.Disable()
     FakeParry.Disable()
