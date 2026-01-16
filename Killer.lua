@@ -69,7 +69,7 @@ local UseFakeSaw = (function()
             connection = Nexus.Services.RunService.Heartbeat:Connect(function()
                 if enabled and isKillerTeam() then
                     executeFakeSaw()
-                    task.wait(10)
+                    task.wait(35)
                 end
             end)
         elseif enabled then
