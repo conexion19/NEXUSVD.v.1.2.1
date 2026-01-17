@@ -200,8 +200,11 @@ local SpearCrosshair = (function()
         local shouldShow = false
         
         if enabled and isKillerTeam() and character then
-            local spearMode = character:GetAttribute("spearmode")
-            shouldShow = spearMode == "spearing"
+            local spearMode = character:GetAttribute("spearmode") or character:GetAttribute("SpearMode")
+            if spearMode then
+                local modeStr = tostring(spearMode):lower()
+                shouldShow = (modeStr == "spearing" or modeStr == "aiming") -- Added aiming just in case
+            end
         end
         
         crosshairFrame.Visible = shouldShow
@@ -907,9 +910,11 @@ end)()
 
 local BreakGenerator = (function()
     local enabled = false
-    local spamInProgress = false
-    local maxSpamCount = 1000
     local teamListeners = {}
+    local hooked = false
+    local originalNamecall = nil
+    local mt = nil
+    local activeBreaks = {} -- table to track active breaking tasks
     
     local function getGeneratorProgress(gen)
         local progress = 0
@@ -932,123 +937,111 @@ local BreakGenerator = (function()
         return math.clamp(progress, 0, 1)
     end
 
-    local function FindNearestGenerator(maxDistance)
-        local character = Nexus.getCharacter()
-        if not character then return nil end
+    local function getBreakGenEvent()
+        local success, result = pcall(function()
+            return Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Generator"):WaitForChild("BreakGenEvent")
+        end)
+        return success and result or nil
+    end
+
+    local function setupHook()
+        if hooked then return end
         
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if not humanoidRootPart then return nil end
+        local BreakGenRemote = getBreakGenEvent()
+        if not BreakGenRemote then return end
+
+        mt = getrawmetatable(game)
+        if not mt then return end
         
-        local playerPosition = humanoidRootPart.Position
-        local nearestGenerator = nil
-        local nearestDistance = math.huge
+        originalNamecall = mt.__namecall
         
-        for _, obj in ipairs(Nexus.Services.Workspace:GetDescendants()) do
-            if obj.Name == "Generator" then
-                local hitBox = obj:FindFirstChild("HitBox")
-                if hitBox then
-                    local distance = (hitBox.Position - playerPosition).Magnitude
-                    if distance < nearestDistance and distance <= maxDistance then
-                        nearestDistance = distance
-                        nearestGenerator = obj
+        local wasReadonly = isreadonly and isreadonly(mt)
+        if setreadonly then
+            setreadonly(mt, false)
+        end
+        
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            local args = {...}
+            
+            if self == BreakGenRemote and method == "FireServer" and enabled and isKillerTeam() then
+                -- Original call proceeds
+                local result = originalNamecall(self, ...)
+                
+                -- Capture the generator arguments
+                local hitBox = args[1]
+                if hitBox and hitBox:IsDescendantOf(workspace) then
+                    local generator = hitBox.Parent
+                    
+                    -- Avoid duplicate tasks for same generator
+                    if generator and not activeBreaks[generator] then
+                        activeBreaks[generator] = true
+                        
+                        task.spawn(function()
+                            while enabled and isKillerTeam() and activeBreaks[generator] do
+                                if not generator or not generator.Parent then break end
+                                
+                                local progress = getGeneratorProgress(generator)
+                                if progress <= 0 then break end
+                                
+                                OriginalFire = originalNamecall -- Use updated reference if needed, but clousre captures it
+                                
+                                -- Re-fire the event
+                                -- We need to use the method call syntax or originalNamecall properly
+                                -- Since originalNamecall expects self as first arg usually in updated Lua environments or hooks
+                                -- safe way: self:FireServer(unpack(args)) but we are hooked.
+                                -- So use originalNamecall(self, ...args)
+                                
+                                pcall(function()
+                                    originalNamecall(self, unpack(args))
+                                end)
+                                
+                                task.wait(0.05) -- Fast spam
+                            end
+                            activeBreaks[generator] = nil
+                        end)
                     end
                 end
-            end
-        end
-        
-        return nearestGenerator, nearestDistance
-    end
-
-    local function FullGeneratorBreak()
-        if not isKillerTeam() then return false end
-        
-        local nearestGenerator, distance = FindNearestGenerator(10)
-        if not nearestGenerator then return false end
-        
-        local progress = getGeneratorProgress(nearestGenerator)
-        if progress <= 0 then return false end
-        
-        local BreakGenEvent = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Generator"):WaitForChild("BreakGenEvent")
-        local hitBox = nearestGenerator:FindFirstChild("HitBox")
-        
-        if hitBox then
-            BreakGenEvent:FireServer(hitBox, 0, true)
-            return true
-        end
-        
-        return false
-    end
-
-    local function SpamGeneratorBreak()
-        if spamInProgress then return end
-        
-        if not isKillerTeam() then return end
-        if not Nexus.Player.Character then return end
-        
-        local nearestGenerator = FindNearestGenerator(10)
-        if not nearestGenerator then return end
-        
-        spamInProgress = true
-        local spamCount = 0
-        
-        local connection
-        connection = Nexus.Services.RunService.Heartbeat:Connect(function()
-            if not spamInProgress then
-                if connection then connection:Disconnect() end
-                return
-            end
-            
-            if not isKillerTeam() or not Nexus.Player.Character then
-                spamInProgress = false
-                if connection then connection:Disconnect() end
-                return
-            end
-            
-            local currentGenerator = FindNearestGenerator(10)
-            if not currentGenerator then
-                spamInProgress = false
-                if connection then connection:Disconnect() end
-                return
-            end
-            
-            local progress = getGeneratorProgress(currentGenerator)
-            if progress <= 0 then
-                spamInProgress = false
-                if connection then connection:Disconnect() end
-                return
-            end
-            
-            local hitBox = currentGenerator:FindFirstChild("HitBox")
-            if hitBox then
-                local BreakGenEvent = Nexus.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Generator"):WaitForChild("BreakGenEvent")
-                BreakGenEvent:FireServer(hitBox, 0, true)
-                spamCount = spamCount + 1
                 
-                if spamCount >= maxSpamCount then
-                    spamInProgress = false
-                    if connection then connection:Disconnect() end
-                    return
-                end
-            else
-                spamInProgress = false
-                if connection then connection:Disconnect() end
-                return
+                return result
             end
+            
+            return originalNamecall(self, ...)
         end)
         
-        local stopConnection
-        stopConnection = Nexus.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if not gameProcessed and input.KeyCode == Enum.KeyCode.Space then
-                if spamInProgress then
-                    spamInProgress = false
-                    if connection then connection:Disconnect() end
-                    if stopConnection then stopConnection:Disconnect() end
-                end
-            end
-        end)
+        if setreadonly and wasReadonly then
+            setreadonly(mt, true)
+        end
+        
+        hooked = true
+    end
+
+    local function removeHook()
+        if not hooked or not mt or not originalNamecall then return end
+        
+        local wasReadonly = isreadonly and isreadonly(mt)
+        if setreadonly then
+            setreadonly(mt, false)
+        end
+        
+        mt.__namecall = originalNamecall
+        
+        if setreadonly and wasReadonly then
+            setreadonly(mt, true)
+        end
+        
+        hooked = false
+        originalNamecall = nil
+        mt = nil
+        activeBreaks = {}
     end
     
     local function updateBreakGenerator()
+        if enabled and isKillerTeam() then
+            setupHook()
+        else
+            removeHook()
+        end
     end
     
     local function Enable()
@@ -1078,7 +1071,7 @@ local BreakGenerator = (function()
         enabled = false
         Nexus.States.BreakGeneratorEnabled = false
         
-        spamInProgress = false
+        removeHook()
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
@@ -1095,9 +1088,7 @@ local BreakGenerator = (function()
     return {
         Enable = Enable,
         Disable = Disable,
-        IsEnabled = function() return enabled end,
-        FullGeneratorBreak = FullGeneratorBreak,
-        SpamGeneratorBreak = SpamGeneratorBreak
+        IsEnabled = function() return enabled end
     }
 end)()
 
