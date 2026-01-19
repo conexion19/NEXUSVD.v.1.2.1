@@ -2216,7 +2216,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     end)
 
     local NoFallToggle = Tabs.Main:AddToggle("NoFall", {
-        Title = "No Fall", 
+        Title = "No Fall [temporarily no work]", 
         Description = "Disables the penalty when falling", 
         Default = false
     })
