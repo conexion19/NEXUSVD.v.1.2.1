@@ -62,6 +62,9 @@ function Binds.ResetAllBinds()
     Binds.KeyStates = {}
 end
 
+function Binds.HandleKeybindChange(funcName, displayName, newKey)
+end
+
 function Binds.Init(nxs)
     Nexus = nxs
     
