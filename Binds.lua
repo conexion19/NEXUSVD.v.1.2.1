@@ -2,14 +2,12 @@ local Nexus = _G.Nexus
 
 local Binds = {
     Keybinds = {},
-    ActiveKeybinds = {},
     KeyStates = {}, 
     CursorUnlock = {
         enabled = false,
         connection = nil,
         mouseLocked = false
-    },
-    DisplayGui = nil
+    }
 }
 
 
@@ -38,122 +36,6 @@ function Binds.ToggleOption(optionName)
     end
 end
 
-function Binds.CreateDisplayGUI()
-    if Binds.DisplayGui then
-        Binds.DisplayGui:Destroy()
-    end
-    
-    local playerGui = Nexus.Player:WaitForChild("PlayerGui")
-    
-    Binds.DisplayGui = Instance.new("ScreenGui")
-    Binds.DisplayGui.Name = "KeybindsDisplay"
-    Binds.DisplayGui.DisplayOrder = 100
-    Binds.DisplayGui.ResetOnSpawn = false
-    Binds.DisplayGui.IgnoreGuiInset = true
-    Binds.DisplayGui.Parent = playerGui
-    
-    local container = Instance.new("Frame")
-    container.Name = "Container"
-    container.BackgroundTransparency = 1
-    container.Size = UDim2.new(0, 250, 0, 0)
-    container.Position = UDim2.new(1, -5, 0, 110)
-    container.AnchorPoint = Vector2.new(1, 0)
-    container.Parent = Binds.DisplayGui
-    
-    local scrollFrame = Instance.new("ScrollingFrame")
-    scrollFrame.Name = "ScrollFrame"
-    scrollFrame.BackgroundTransparency = 1
-    scrollFrame.Size = UDim2.new(1, 0, 1, 0)
-    scrollFrame.Position = UDim2.new(0, 0, 0, 0)
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
-    scrollFrame.ScrollBarThickness = 0
-    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scrollFrame.Parent = container
-    
-    local uiListLayout = Instance.new("UIListLayout")
-    uiListLayout.Padding = UDim.new(0, 4)
-    uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    uiListLayout.Parent = scrollFrame
-    
-    Binds.UpdateDisplay()
-end
-
-function Binds.UpdateDisplay()
-    if not Binds.DisplayGui then return end
-    
-    local scrollFrame = Binds.DisplayGui.Container.ScrollFrame
-    
-    for _, child in ipairs(scrollFrame:GetChildren()) do
-        if child:IsA("TextLabel") then
-            child:Destroy()
-        end
-    end
-    
-    local sortedKeys = {}
-    for funcName, _ in pairs(Binds.ActiveKeybinds) do
-        table.insert(sortedKeys, funcName)
-    end
-    
-    table.sort(sortedKeys)
-    
-    for _, funcName in ipairs(sortedKeys) do
-        local data = Binds.ActiveKeybinds[funcName]
-        if data and data.key ~= "" then
-            local cleanKey = Binds.ExtractKeyName(data.key)
-            Binds.CreateKeybindDisplay(scrollFrame, data.displayName, cleanKey, funcName)
-        end
-    end
-    
-    local itemCount = #sortedKeys
-    local itemHeight = 20
-    local padding = 4
-    local maxHeight = 400
-    
-    local totalHeight = (itemHeight + padding) * itemCount - padding
-    if totalHeight > maxHeight then
-        totalHeight = maxHeight
-    elseif totalHeight < 0 then
-        totalHeight = 0
-    end
-    
-    Binds.DisplayGui.Container.Size = UDim2.new(0, 250, 0, totalHeight)
-end
-
-function Binds.CreateKeybindDisplay(parent, displayName, key, funcName)
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Name = "Keybind_" .. funcName
-    textLabel.Text = displayName .. " - " .. key
-    textLabel.Font = Enum.Font.GothamMedium
-    textLabel.TextSize = 14
-    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textLabel.BackgroundTransparency = 1
-    textLabel.Size = UDim2.new(1, 0, 0, 20)
-    textLabel.TextXAlignment = Enum.TextXAlignment.Right
-    textLabel.TextTruncate = Enum.TextTruncate.None
-    textLabel.TextWrapped = false
-    textLabel.RichText = false
-    textLabel.Parent = parent
-    
-    local option = Nexus.Options[funcName]
-    if option then
-        Binds.UpdateKeyColor(textLabel, option.Value)
-    else
-        Binds.UpdateKeyColor(textLabel, Binds.KeyStates[funcName] or false)
-    end
-end
-
-function Binds.UpdateKeyColor(textLabel, isEnabled)
-    if not textLabel or not textLabel.Parent then return end
-    
-    if isEnabled then
-        textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    else
-        textLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-    end
-end
-
 function Binds.UpdateKeyState(funcName)
     local option = Nexus.Options[funcName]
     if option then
@@ -165,39 +47,19 @@ function Binds.UpdateKeyState(funcName)
             Binds.KeyStates[funcName] = not Binds.KeyStates[funcName]
         end
     end
-    
-    if Binds.DisplayGui then
-        local scrollFrame = Binds.DisplayGui.Container.ScrollFrame
-        local textLabel = scrollFrame:FindFirstChild("Keybind_" .. funcName)
-        if textLabel then
-            Binds.UpdateKeyColor(textLabel, Binds.KeyStates[funcName])
-        end
-    end
 end
 
-function Binds.UpdateKeybindDisplay(funcName, displayName, key)
-    if displayName and key then
-        local cleanKey = Binds.ExtractKeyName(key)
-        if cleanKey ~= "" then
-            Binds.ActiveKeybinds[funcName] = {
-                displayName = displayName,
-                key = cleanKey
-            }
-            print("[Keybinds] " .. displayName .. " -> " .. cleanKey)
-        else
-            Binds.ActiveKeybinds[funcName] = nil
-            Binds.KeyStates[funcName] = nil
+function Binds.ResetAllBinds()
+    for idx, option in pairs(Nexus.Options) do
+        if option and option.Type == "Keybind" and idx ~= "MenuKeybind" then
+            if option.Toggled then
+                option.Toggled = false
+                pcall(function() option:DoClick() end)
+            end
+            pcall(function() option:SetValue("", option.Mode) end)
         end
     end
-    
-    Binds.UpdateDisplay()
-end
-
-function Binds.HandleKeybindChange(funcName, displayName, newKey)
-    local cleanKey = Binds.ExtractKeyName(newKey)
-    print("Keybind changed for " .. displayName .. " to: " .. cleanKey)
-    
-    Binds.UpdateKeybindDisplay(funcName, displayName, newKey)
+    Binds.KeyStates = {}
 end
 
 function Binds.Init(nxs)
@@ -208,9 +70,16 @@ function Binds.Init(nxs)
     local Tabs = Nexus.Tabs
     if not Tabs.Binds then return end
     
-    Binds.CreateDisplayGUI()
+    Tabs.Binds:AddButton({
+        Title = "Reset All Binds",
+        Description = "Сбросить все назначенные клавиши",
+        Callback = function()
+            Binds.ResetAllBinds()
+            Nexus.Notify("Binds", "All keybinds have been reset", 3)
+        end
+    })
     
-   Tabs.Binds:AddSection("Survivor")
+    Tabs.Binds:AddSection("Survivor")
     
     local AutoParryKeybind = Tabs.Binds:AddKeybind("AutoParryKeybind", {
         Title = "AutoParry",
@@ -672,15 +541,8 @@ function Binds.Cleanup()
     Binds.DisableCursorUnlock()
     Binds.ResetCursorState()
     
-    if Binds.DisplayGui then
-        Binds.DisplayGui:Destroy()
-        Binds.DisplayGui = nil
-    end
-    
-    Binds.ActiveKeybinds = {}
     Binds.KeyStates = {}
     Binds.Keybinds = {}
-
 end
 
 return Binds
