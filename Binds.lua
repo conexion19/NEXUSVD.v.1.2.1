@@ -72,7 +72,7 @@ function Binds.Init(nxs)
     
     Tabs.Binds:AddButton({
         Title = "Reset All Binds",
-        Description = "Сбросить все назначенные клавиши",
+        Description = "Reset all assigned keys",
         Callback = function()
             Binds.ResetAllBinds()
             Nexus.Notify("Binds", "All keybinds have been reset", 3)
