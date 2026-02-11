@@ -968,15 +968,15 @@ local NoSlowdown = (function()
     }
 end)()
 
--- AUTO PARRY --
+-- AUTO PARRY 
 
 local AutoParry = (function()
     local spamActive = false
     local RANGE = 10
-    local lastCheck = 0
-    local CHECK_INTERVAL = 0.01
-    local connection = nil
     local teamListeners = {}
+    local animConnections = {}
+    local playerAddedConn = nil
+    local playerRemovingConn = nil
 
     local AttackAnimations = {
          "rbxassetid://110355011987939",
@@ -1001,37 +1001,8 @@ local AutoParry = (function()
         AttackAnimationsLookup[animId] = true
     end
 
-    local function isBlockingInRange()
-        local currentTime = tick()
-        if currentTime - lastCheck < CHECK_INTERVAL then return false end
-        lastCheck = currentTime
-        
-        local myChar, myPos = Nexus.Player.Character, Nexus.Player.Character and Nexus.Player.Character.HumanoidRootPart and Nexus.Player.Character.HumanoidRootPart.Position
-        if not myChar or not myPos then return false end
-
-        for _, plr in ipairs(Nexus.Services.Players:GetPlayers()) do
-            if plr == Nexus.Player then continue end
-            local char, targetRoot = plr.Character, plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-            if not char or not targetRoot then continue end
-            
-            local targetPos = targetRoot.Position
-            local distance = (myPos - targetPos).Magnitude
-            
-            if distance > RANGE then continue end
-
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
-                    if track.Animation and AttackAnimationsLookup[track.Animation.AnimationId] then 
-                        return true 
-                    end
-                end
-            end
-        end
-        return false
-    end
-
     local function PerformParry()
+        if spamActive then return end
         spamActive = true
         Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
         task.spawn(function()
@@ -1041,39 +1012,123 @@ local AutoParry = (function()
         end)
     end
 
-    local function setupAutoParry()
-        if connection then
-            connection:Disconnect()
-            connection = nil
-        end
-        
-        if Nexus.States.AutoParryEnabled and isSurvivorTeam() then
-            connection = Nexus.Services.RunService.Heartbeat:Connect(function()
-                if not Nexus.States.AutoParryEnabled or not isSurvivorTeam() then
-                    if spamActive then 
-                        spamActive = false; 
-                        Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0) 
-                    end
-                    return
-                end
+    local function isInRange(targetCharacter)
+        local myChar = Nexus.Player.Character
+        if not myChar then return false end
+        local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+        local targetRoot = targetCharacter:FindFirstChild("HumanoidRootPart")
+        if not myRoot or not targetRoot then return false end
+        return (myRoot.Position - targetRoot.Position).Magnitude <= RANGE
+    end
 
-                if isBlockingInRange() then
-                    if not spamActive then
-                        PerformParry()
-                    end
-                elseif spamActive then
-                    spamActive = false
-                    Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
+    local function disconnectPlayer(player)
+        if animConnections[player] then
+            for _, conn in ipairs(animConnections[player]) do
+                pcall(function() conn:Disconnect() end)
+            end
+            animConnections[player] = nil
+        end
+    end
+
+    local function connectCharacter(player, character)
+        disconnectPlayer(player)
+        if player == Nexus.Player then return end
+
+        animConnections[player] = {}
+
+        local function onAnimPlayed(animTrack)
+            if not Nexus.States.AutoParryEnabled then return end
+            if not isSurvivorTeam() then return end
+
+            local animId = animTrack.Animation and animTrack.Animation.AnimationId
+            if animId and AttackAnimationsLookup[animId] then
+                if isInRange(character) then
+                    PerformParry()
                 end
+            end
+        end
+
+        local function tryConnect()
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not humanoid then return end
+
+            local animator = humanoid:FindFirstChildOfClass("Animator")
+            if not animator then
+                local waitConn
+                waitConn = humanoid.ChildAdded:Connect(function(child)
+                    if child:IsA("Animator") then
+                        waitConn:Disconnect()
+                        local animPlayedConn = child.AnimationPlayed:Connect(onAnimPlayed)
+                        table.insert(animConnections[player], animPlayedConn)
+                    end
+                end)
+                table.insert(animConnections[player], waitConn)
+                return
+            end
+
+            local animPlayedConn = animator.AnimationPlayed:Connect(onAnimPlayed)
+            table.insert(animConnections[player], animPlayedConn)
+        end
+
+        tryConnect()
+
+        local charAddedConn = player.CharacterAdded:Connect(function(newChar)
+            task.wait(0.1)
+            if Nexus.States.AutoParryEnabled then
+                connectCharacter(player, newChar)
+            end
+        end)
+        table.insert(animConnections[player], charAddedConn)
+    end
+
+    local function connectAllPlayers()
+        for _, player in ipairs(Nexus.Services.Players:GetPlayers()) do
+            if player ~= Nexus.Player and player.Character then
+                connectCharacter(player, player.Character)
+            elseif player ~= Nexus.Player then
+                animConnections[player] = {}
+                local charConn = player.CharacterAdded:Connect(function(char)
+                    task.wait(0.1)
+                    connectCharacter(player, char)
+                end)
+                table.insert(animConnections[player], charConn)
+            end
+        end
+
+        playerAddedConn = Nexus.Services.Players.PlayerAdded:Connect(function(player)
+            animConnections[player] = {}
+            local conn = player.CharacterAdded:Connect(function(char)
+                task.wait(0.1)
+                connectCharacter(player, char)
             end)
-        elseif Nexus.States.AutoParryEnabled then
+            table.insert(animConnections[player], conn)
+        end)
+
+        playerRemovingConn = Nexus.Services.Players.PlayerRemoving:Connect(function(player)
+            disconnectPlayer(player)
+        end)
+    end
+
+    local function disconnectAll()
+        for player, _ in pairs(animConnections) do
+            disconnectPlayer(player)
+        end
+        animConnections = {}
+        if playerAddedConn then playerAddedConn:Disconnect(); playerAddedConn = nil end
+        if playerRemovingConn then playerRemovingConn:Disconnect(); playerRemovingConn = nil end
+    end
+
+    local function setupAutoParry()
+        disconnectAll()
+        if Nexus.States.AutoParryEnabled and isSurvivorTeam() then
+            connectAllPlayers()
         end
     end
 
     local function Enable()
         if Nexus.States.AutoParryEnabled then return end
         Nexus.States.AutoParryEnabled = true
-        
+
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
@@ -1083,26 +1138,20 @@ local AutoParry = (function()
                 Nexus.safeDisconnect(listener)
             end
         end
-        
         teamListeners = {}
-        
+
         table.insert(teamListeners, setupTeamListener(setupAutoParry))
-        
         setupAutoParry()
     end
 
     local function Disable()
         Nexus.States.AutoParryEnabled = false
-        if spamActive then 
-            spamActive = false; 
-            Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0) 
-        end 
-        
-        if connection then
-            connection:Disconnect()
-            connection = nil
+        if spamActive then
+            spamActive = false
+            Nexus.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
         end
-        
+        disconnectAll()
+
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
@@ -1113,7 +1162,6 @@ local AutoParry = (function()
             end
         end
         teamListeners = {}
-            
     end
 
     return {
