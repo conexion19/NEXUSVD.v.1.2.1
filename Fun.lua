@@ -440,8 +440,15 @@ function Fun.FlingNearest()
     local origin = myRoot.CFrame
     task.spawn(function()
         local targetCF = targetRoot.CFrame
-        for i = 1, 10 do
-            pcall(function() myRoot.CFrame = targetCF end)
+        for i = 1, 20 do
+            pcall(function()
+                myRoot.CFrame = targetCF
+                targetRoot.AssemblyLinearVelocity = Vector3.new(
+                    math.random(-2000, 2000),
+                    math.random(1500, 3000),
+                    math.random(-2000, 2000)
+                )
+            end)
             task.wait()
         end
         pcall(function() myRoot.CFrame = origin end)
@@ -463,7 +470,14 @@ function Fun.StartAutoFling()
 
         local origin = myRoot.CFrame
         returning = true
-        pcall(function() myRoot.CFrame = targetRoot.CFrame end)
+        pcall(function()
+            myRoot.CFrame = targetRoot.CFrame
+            targetRoot.AssemblyLinearVelocity = Vector3.new(
+                math.random(-2000, 2000),
+                math.random(1500, 3000),
+                math.random(-2000, 2000)
+            )
+        end)
         task.wait()
         pcall(function() myRoot.CFrame = origin end)
         returning = false
