@@ -11,7 +11,8 @@ local Fun = {
         tool = nil,
         track = nil
     },
-    SpinConnection = nil
+    SpinConnection = nil,
+    FlingConnection = nil
 }
 
 function Fun.Init(nxs)
@@ -116,7 +117,26 @@ function Fun.Init(nxs)
     })
     
     Tabs.Fun:AddSection("Miscellaneous")
-    
+
+    Tabs.Fun:AddButton({
+        Title = "Fling Nearest Player",
+        Description = "Launches the closest player into the air",
+        Callback = function()
+            Nexus.SafeCallback(Fun.FlingNearest)
+        end
+    })
+
+    local AutoFlingToggle = Tabs.Fun:AddToggle("AutoFling", {
+        Title = "Auto Fling",
+        Description = "Continuously flings the nearest player",
+        Default = false
+    })
+    AutoFlingToggle:OnChanged(function(v)
+        Nexus.SafeCallback(function()
+            if v then Fun.StartAutoFling() else Fun.StopAutoFling() end
+        end)
+    end)
+
     local SpinToggle = Tabs.Fun:AddToggle("SpinCharacter", {
         Title = "Spin Character", 
         Description = "Makes your character spin continuously", 
@@ -387,6 +407,65 @@ function Fun.ToggleSpin(enabled)
     end
 end
 
+function Fun.GetNearestPlayer()
+    local myRoot = Nexus.getRootPart()
+    if not myRoot then return nil end
+    local closest = nil
+    local closestDist = math.huge
+    for _, player in ipairs(Nexus.Services.Players:GetPlayers()) do
+        if player ~= Nexus.Player and player.Character then
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if root and hum and hum.Health > 0 then
+                local dist = (root.Position - myRoot.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closest = player
+                end
+            end
+        end
+    end
+    return closest
+end
+
+function Fun.FlingNearest()
+    local target = Fun.GetNearestPlayer()
+    if not target or not target.Character then return end
+    local root = target.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    pcall(function()
+        root.AssemblyLinearVelocity = Vector3.new(
+            math.random(-300, 300),
+            math.random(400, 800),
+            math.random(-300, 300)
+        )
+    end)
+end
+
+function Fun.StartAutoFling()
+    if Fun.FlingConnection then return end
+    Fun.FlingConnection = Nexus.Services.RunService.Heartbeat:Connect(function()
+        local target = Fun.GetNearestPlayer()
+        if not target or not target.Character then return end
+        local root = target.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        pcall(function()
+            root.AssemblyLinearVelocity = Vector3.new(
+                math.random(-300, 300),
+                math.random(400, 800),
+                math.random(-300, 300)
+            )
+        end)
+    end)
+end
+
+function Fun.StopAutoFling()
+    if Fun.FlingConnection then
+        Fun.FlingConnection:Disconnect()
+        Fun.FlingConnection = nil
+    end
+end
+
 function Fun.StartSpin()
     local character = Nexus.getCharacter()
     if not character then return end
@@ -418,6 +497,7 @@ function Fun.Cleanup()
     Fun.StopEmote()
     Fun.StopJerk()
     Fun.StopSpin()
+    Fun.StopAutoFling()
     
     if Fun.SpinConnection then
         Fun.SpinConnection:Disconnect()
