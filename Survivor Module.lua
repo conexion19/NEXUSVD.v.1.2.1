@@ -2069,6 +2069,378 @@ local NoHitbox = (function()
     return {Enable = Enable, Disable = Disable}
 end)()
 
+-- SPEED VAULT --
+
+local SpeedVault = (function()
+    local enabled = false
+    local currentValue = 1.0
+    local connection = nil
+    local teamListeners = {}
+
+    local function applyAttribute()
+        if not enabled or not isSurvivorTeam() then return end
+        local char = Nexus.getCharacter()
+        if not char then return end
+        pcall(function() char:SetAttribute("vaultspeed", currentValue) end)
+    end
+
+    local function updateState()
+        if connection then connection:Disconnect(); connection = nil end
+        if enabled and isSurvivorTeam() then
+            connection = Nexus.Services.RunService.Heartbeat:Connect(applyAttribute)
+        else
+            local char = Nexus.getCharacter()
+            if char then pcall(function() char:SetAttribute("vaultspeed", nil) end) end
+        end
+    end
+
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.SpeedVaultEnabled = true
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+        table.insert(teamListeners, setupTeamListener(updateState))
+        updateState()
+    end
+
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.SpeedVaultEnabled = false
+        if connection then connection:Disconnect(); connection = nil end
+        local char = Nexus.getCharacter()
+        if char then pcall(function() char:SetAttribute("vaultspeed", nil) end) end
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+    end
+
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        SetValue = function(v) currentValue = v; if enabled then applyAttribute() end end
+    }
+end)()
+
+-- SPEED HACK [ATTRIBUTE] --
+
+local SpeedHackAttr = (function()
+    local enabled = false
+    local currentValue = 1.0
+    local connection = nil
+    local teamListeners = {}
+
+    local function applyAttribute()
+        if not enabled or not isSurvivorTeam() then return end
+        local char = Nexus.getCharacter()
+        if not char then return end
+        pcall(function() char:SetAttribute("speedboost", currentValue) end)
+    end
+
+    local function updateState()
+        if connection then connection:Disconnect(); connection = nil end
+        if enabled and isSurvivorTeam() then
+            connection = Nexus.Services.RunService.Heartbeat:Connect(applyAttribute)
+        else
+            local char = Nexus.getCharacter()
+            if char then pcall(function() char:SetAttribute("speedboost", nil) end) end
+        end
+    end
+
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.SpeedHackAttrEnabled = true
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+        table.insert(teamListeners, setupTeamListener(updateState))
+        updateState()
+    end
+
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.SpeedHackAttrEnabled = false
+        if connection then connection:Disconnect(); connection = nil end
+        local char = Nexus.getCharacter()
+        if char then pcall(function() char:SetAttribute("speedboost", nil) end) end
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+    end
+
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        SetValue = function(v) currentValue = v; if enabled then applyAttribute() end end
+    }
+end)()
+
+-- VAULT DISTANCE --
+
+local VaultDistance = (function()
+    local enabled = false
+    local currentValue = 5
+    local connection = nil
+    local teamListeners = {}
+
+    local function applyAttribute()
+        if not enabled or not isSurvivorTeam() then return end
+        local char = Nexus.getCharacter()
+        if not char then return end
+        pcall(function() char:SetAttribute("__VaultFireCount", currentValue) end)
+    end
+
+    local function updateState()
+        if connection then connection:Disconnect(); connection = nil end
+        if enabled and isSurvivorTeam() then
+            connection = Nexus.Services.RunService.Heartbeat:Connect(applyAttribute)
+        else
+            local char = Nexus.getCharacter()
+            if char then pcall(function() char:SetAttribute("__VaultFireCount", nil) end) end
+        end
+    end
+
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.VaultDistanceEnabled = true
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+        table.insert(teamListeners, setupTeamListener(updateState))
+        updateState()
+    end
+
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.VaultDistanceEnabled = false
+        if connection then connection:Disconnect(); connection = nil end
+        local char = Nexus.getCharacter()
+        if char then pcall(function() char:SetAttribute("__VaultFireCount", nil) end) end
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+    end
+
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        SetValue = function(v) currentValue = v; if enabled then applyAttribute() end end
+    }
+end)()
+
+-- HEAL BOOST --
+
+local HealBoost = (function()
+    local enabled = false
+    local currentValue = 1.0
+    local connection = nil
+    local teamListeners = {}
+
+    local function applyAttribute()
+        if not enabled or not isSurvivorTeam() then return end
+        local char = Nexus.getCharacter()
+        if not char then return end
+        pcall(function() char:SetAttribute("healboost", currentValue) end)
+    end
+
+    local function updateState()
+        if connection then connection:Disconnect(); connection = nil end
+        if enabled and isSurvivorTeam() then
+            connection = Nexus.Services.RunService.Heartbeat:Connect(applyAttribute)
+        else
+            local char = Nexus.getCharacter()
+            if char then pcall(function() char:SetAttribute("healboost", nil) end) end
+        end
+    end
+
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.HealBoostEnabled = true
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+        table.insert(teamListeners, setupTeamListener(updateState))
+        updateState()
+    end
+
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.HealBoostEnabled = false
+        if connection then connection:Disconnect(); connection = nil end
+        local char = Nexus.getCharacter()
+        if char then pcall(function() char:SetAttribute("healboost", nil) end) end
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+    end
+
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        SetValue = function(v) currentValue = v; if enabled then applyAttribute() end end
+    }
+end)()
+
+-- REPAIR BOOST --
+
+local RepairBoost = (function()
+    local enabled = false
+    local currentValue = 0
+    local connection = nil
+    local teamListeners = {}
+
+    local function applyAttribute()
+        if not enabled or not isSurvivorTeam() then return end
+        local char = Nexus.getCharacter()
+        if not char then return end
+        pcall(function() char:SetAttribute("repairboost", currentValue) end)
+    end
+
+    local function updateState()
+        if connection then connection:Disconnect(); connection = nil end
+        if enabled and isSurvivorTeam() then
+            connection = Nexus.Services.RunService.Heartbeat:Connect(applyAttribute)
+        else
+            local char = Nexus.getCharacter()
+            if char then pcall(function() char:SetAttribute("repairboost", nil) end) end
+        end
+    end
+
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.RepairBoostEnabled = true
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+        table.insert(teamListeners, setupTeamListener(updateState))
+        updateState()
+    end
+
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.RepairBoostEnabled = false
+        if connection then connection:Disconnect(); connection = nil end
+        local char = Nexus.getCharacter()
+        if char then pcall(function() char:SetAttribute("repairboost", nil) end) end
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+    end
+
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        SetValue = function(v) currentValue = v; if enabled then applyAttribute() end end
+    }
+end)()
+
+-- BLEED BOOST --
+
+local BleedBoost = (function()
+    local enabled = false
+    local currentValue = 0.0
+    local connection = nil
+    local teamListeners = {}
+
+    local function applyAttribute()
+        if not enabled or not isSurvivorTeam() then return end
+        local char = Nexus.getCharacter()
+        if not char then return end
+        pcall(function() char:SetAttribute("bleedboost", currentValue) end)
+    end
+
+    local function updateState()
+        if connection then connection:Disconnect(); connection = nil end
+        if enabled and isSurvivorTeam() then
+            connection = Nexus.Services.RunService.Heartbeat:Connect(applyAttribute)
+        else
+            local char = Nexus.getCharacter()
+            if char then pcall(function() char:SetAttribute("bleedboost", nil) end) end
+        end
+    end
+
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.BleedBoostEnabled = true
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+        table.insert(teamListeners, setupTeamListener(updateState))
+        updateState()
+    end
+
+    local function Disable()
+        if not enabled then return end
+        enabled = false
+        Nexus.States.BleedBoostEnabled = false
+        if connection then connection:Disconnect(); connection = nil end
+        local char = Nexus.getCharacter()
+        if char then pcall(function() char:SetAttribute("bleedboost", nil) end) end
+        for _, listener in ipairs(teamListeners) do
+            if type(listener) == "table" then
+                for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
+            else Nexus.safeDisconnect(listener) end
+        end
+        teamListeners = {}
+    end
+
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        IsEnabled = function() return enabled end,
+        SetValue = function(v) currentValue = v; if enabled then applyAttribute() end end
+    }
+end)()
+
 local function ResetAllHealing()
     healingStates.silentHealRunning = false
     healingStates.instantHealRunning = false
@@ -2378,6 +2750,140 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
             end
         end)
     end)
+
+    Tabs.Main:AddSection("Attributes")
+
+    local SpeedVaultToggle = Tabs.Main:AddToggle("SpeedVault", {
+        Title = "Speed Vault",
+        Description = "Increases vault speed via vaultspeed attribute",
+        Default = false
+    })
+    SpeedVaultToggle:OnChanged(function(v)
+        Nexus.SafeCallback(function()
+            if v then SpeedVault.Enable() else SpeedVault.Disable() end
+        end)
+    end)
+    Tabs.Main:AddSlider("SpeedVaultValue", {
+        Title = "Vault Speed Value",
+        Description = "Set vaultspeed attribute (1 - 50)",
+        Default = 1,
+        Min = 1,
+        Max = 50,
+        Rounding = 2,
+        Callback = function(value)
+            Nexus.SafeCallback(function() SpeedVault.SetValue(value) end)
+        end
+    })
+
+    local SpeedHackAttrToggle = Tabs.Main:AddToggle("SpeedHackAttr", {
+        Title = "Speed Hack [Attribute]",
+        Description = "Increases movement speed via speedboost attribute",
+        Default = false
+    })
+    SpeedHackAttrToggle:OnChanged(function(v)
+        Nexus.SafeCallback(function()
+            if v then SpeedHackAttr.Enable() else SpeedHackAttr.Disable() end
+        end)
+    end)
+    Tabs.Main:AddSlider("SpeedHackAttrValue", {
+        Title = "Speed Boost Value",
+        Description = "Set speedboost attribute (1 - 100)",
+        Default = 1,
+        Min = 1,
+        Max = 100,
+        Rounding = 2,
+        Callback = function(value)
+            Nexus.SafeCallback(function() SpeedHackAttr.SetValue(value) end)
+        end
+    })
+
+    local VaultDistanceToggle = Tabs.Main:AddToggle("VaultDistance", {
+        Title = "Vault Distance",
+        Description = "Increases vault distance via __VaultFireCount attribute",
+        Default = false
+    })
+    VaultDistanceToggle:OnChanged(function(v)
+        Nexus.SafeCallback(function()
+            if v then VaultDistance.Enable() else VaultDistance.Disable() end
+        end)
+    end)
+    Tabs.Main:AddSlider("VaultDistanceValue", {
+        Title = "Vault Fire Count",
+        Description = "Set __VaultFireCount attribute (5 - 30)",
+        Default = 5,
+        Min = 5,
+        Max = 30,
+        Rounding = 1,
+        Callback = function(value)
+            Nexus.SafeCallback(function() VaultDistance.SetValue(value) end)
+        end
+    })
+
+    local HealBoostToggle = Tabs.Main:AddToggle("HealBoost", {
+        Title = "Heal Boost",
+        Description = "Increases healing speed via healboost attribute",
+        Default = false
+    })
+    HealBoostToggle:OnChanged(function(v)
+        Nexus.SafeCallback(function()
+            if v then HealBoost.Enable() else HealBoost.Disable() end
+        end)
+    end)
+    Tabs.Main:AddSlider("HealBoostValue", {
+        Title = "Heal Boost Value",
+        Description = "Set healboost attribute (1 - 100)",
+        Default = 1,
+        Min = 1,
+        Max = 100,
+        Rounding = 2,
+        Callback = function(value)
+            Nexus.SafeCallback(function() HealBoost.SetValue(value) end)
+        end
+    })
+
+    local RepairBoostToggle = Tabs.Main:AddToggle("RepairBoost", {
+        Title = "Repair Boost",
+        Description = "Increases repair speed via repairboost attribute",
+        Default = false
+    })
+    RepairBoostToggle:OnChanged(function(v)
+        Nexus.SafeCallback(function()
+            if v then RepairBoost.Enable() else RepairBoost.Disable() end
+        end)
+    end)
+    Tabs.Main:AddSlider("RepairBoostValue", {
+        Title = "Repair Boost Value",
+        Description = "Set repairboost attribute (0 - 100)",
+        Default = 0,
+        Min = 0,
+        Max = 100,
+        Rounding = 2,
+        Callback = function(value)
+            Nexus.SafeCallback(function() RepairBoost.SetValue(value) end)
+        end
+    })
+
+    local BleedBoostToggle = Tabs.Main:AddToggle("BleedBoost", {
+        Title = "Bleed Boost",
+        Description = "Reduces bleed via bleedboost attribute (0 = min bleed)",
+        Default = false
+    })
+    BleedBoostToggle:OnChanged(function(v)
+        Nexus.SafeCallback(function()
+            if v then BleedBoost.Enable() else BleedBoost.Disable() end
+        end)
+    end)
+    Tabs.Main:AddSlider("BleedBoostValue", {
+        Title = "Bleed Boost Value",
+        Description = "Set bleedboost attribute (0 = min, 1 = max)",
+        Default = 0,
+        Min = 0,
+        Max = 1,
+        Rounding = 2,
+        Callback = function(value)
+            Nexus.SafeCallback(function() BleedBoost.SetValue(value) end)
+        end
+    })
     
 end
 
@@ -2397,6 +2903,12 @@ function Survivor.Cleanup()
     TwistSilentAim.Disable()
     NoHitbox.Disable()
     AutoPerfectSkill.Disable()
+    SpeedVault.Disable()
+    SpeedHackAttr.Disable()
+    VaultDistance.Disable()
+    HealBoost.Disable()
+    RepairBoost.Disable()
+    BleedBoost.Disable()
     
     for key, connection in pairs(Survivor.Connections) do
         Nexus.safeDisconnect(connection)
