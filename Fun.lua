@@ -407,11 +407,11 @@ function Fun.ToggleSpin(enabled)
     end
 end
 
-function Fun.GetNearestPlayer()
+function Fun.GetNearestPlayer(maxRange)
     local myRoot = Nexus.getRootPart()
     if not myRoot then return nil end
     local closest = nil
-    local closestDist = math.huge
+    local closestDist = maxRange or math.huge
     for _, player in ipairs(Nexus.Services.Players:GetPlayers()) do
         if player ~= Nexus.Player and player.Character then
             local root = player.Character:FindFirstChild("HumanoidRootPart")
@@ -429,33 +429,44 @@ function Fun.GetNearestPlayer()
 end
 
 function Fun.FlingNearest()
-    local target = Fun.GetNearestPlayer()
+    local myRoot = Nexus.getRootPart()
+    if not myRoot then return end
+
+    local target = Fun.GetNearestPlayer(20)
     if not target or not target.Character then return end
-    local root = target.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    pcall(function()
-        root.AssemblyLinearVelocity = Vector3.new(
-            math.random(-300, 300),
-            math.random(400, 800),
-            math.random(-300, 300)
-        )
+    local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+
+    local origin = myRoot.CFrame
+    task.spawn(function()
+        local targetCF = targetRoot.CFrame
+        for i = 1, 10 do
+            pcall(function() myRoot.CFrame = targetCF end)
+            task.wait()
+        end
+        pcall(function() myRoot.CFrame = origin end)
     end)
 end
 
 function Fun.StartAutoFling()
     if Fun.FlingConnection then return end
+    local returning = false
     Fun.FlingConnection = Nexus.Services.RunService.Heartbeat:Connect(function()
-        local target = Fun.GetNearestPlayer()
+        if returning then return end
+        local myRoot = Nexus.getRootPart()
+        if not myRoot then return end
+
+        local target = Fun.GetNearestPlayer(20)
         if not target or not target.Character then return end
-        local root = target.Character:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        pcall(function()
-            root.AssemblyLinearVelocity = Vector3.new(
-                math.random(-300, 300),
-                math.random(400, 800),
-                math.random(-300, 300)
-            )
-        end)
+        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then return end
+
+        local origin = myRoot.CFrame
+        returning = true
+        pcall(function() myRoot.CFrame = targetRoot.CFrame end)
+        task.wait()
+        pcall(function() myRoot.CFrame = origin end)
+        returning = false
     end)
 end
 
