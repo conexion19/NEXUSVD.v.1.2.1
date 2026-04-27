@@ -2507,7 +2507,7 @@ local ParryCircleVisual = (function()
         dome.CastShadow = false
         dome.Material = Enum.Material.Neon
         dome.Color = Color3.fromRGB(0, 255, 80)  -- зелёный
-        dome.Transparency = 0.55  -- полупрозрачный
+        dome.Transparency = 0.58  -- полупрозрачный
         dome.Shape = Enum.PartType.Cylinder  -- форма цилиндра
         dome.Parent = workspace
         
