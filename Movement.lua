@@ -22,19 +22,17 @@ local Movement = {
     }
 }
 
-
+-- Use global helper functions from Nexus
 function Movement.GetCharacter()
-    return Nexus.Player.Character
+    return Nexus.getCharacter()
 end
 
 function Movement.GetHumanoid()
-    local char = Movement.GetCharacter()
-    return char and char:FindFirstChildOfClass("Humanoid")
+    return Nexus.getHumanoid()
 end
 
 function Movement.GetRootPart()
-    local char = Movement.GetCharacter()
-    return char and char:FindFirstChild("HumanoidRootPart")
+    return Nexus.getRootPart()
 end
 
 -- WALK SPEED --
