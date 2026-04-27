@@ -2458,43 +2458,51 @@ local ParryCircleVisual = (function()
 
     local function createCircle()
         destroyCircle()
-        local p = Instance.new("Part")
-        p.Name = "NexusParryCircle"
-        p.Anchored = true
-        p.CanCollide = false
-        p.CanTouch = false
-        p.CastShadow = false
-        p.Transparency = 0.55              -- полупрозрачный
-        p.Color = Color3.fromRGB(0, 255, 80) -- зелёный цвет
-        local r = AutoParry.GetRange()
-        p.Size = Vector3.new(r * 2, 0.05, r * 2)
-        local mesh = Instance.new("SpecialMesh")
-        mesh.MeshType = Enum.MeshType.Cylinder
-        mesh.Scale = Vector3.new(1, 1, 1)
-        mesh.Parent = p
-        pcall(function() p.Parent = workspace end)
-        return p
-    end
-
-    local function isInDanger()
-        local myRoot = Nexus.getRootPart()
-        if not myRoot then return false end
-        for _, player in ipairs(Nexus.Services.Players:GetPlayers()) do
-            if player ~= Nexus.Player and player.Character then
-                local root = player.Character:FindFirstChild("HumanoidRootPart")
-                local hum = player.Character:FindFirstChildOfClass("Humanoid")
-                if root and hum and hum.Health > 0 then
-                    local isKiller = false
-                    if player.Team then
-                        isKiller = player.Team.Name:lower():find("killer") ~= nil
-                    end
-                    if isKiller and (root.Position - myRoot.Position).Magnitude <= AutoParry.GetRange() then
-                        return true
-                    end
-                end
-            end
+        
+        -- Создаём основу (невидимую) для позиционирования
+        local base = Instance.new("Part")
+        base.Name = "NexusParryCircle"
+        base.Anchored = true
+        base.CanCollide = false
+        base.CanTouch = false
+        base.CastShadow = false
+        base.Transparency = 1  -- полностью невидимая основа
+        base.Size = Vector3.new(1, 1, 1)
+        
+        -- Создаём множество маленьких сегментов для формирования кольца
+        local segments = 80  -- количество сегментов (больше = плавнее круг)
+        local radius = AutoParry.GetRange()
+        local thickness = 0.15
+        
+        for i = 1, segments do
+            local angle1 = (i - 1) / segments * math.pi * 2
+            local angle2 = i / segments * math.pi * 2
+            
+            -- Средний угол для позиции сегмента
+            local midAngle = (angle1 + angle2) / 2
+            
+            -- Создаём сегмент
+            local segment = Instance.new("Part")
+            segment.Name = "Segment"
+            segment.Anchored = true
+            segment.CanCollide = false
+            segment.CanTouch = false
+            segment.CastShadow = false
+            segment.Material = Enum.Material.SmoothPlastic
+            segment.Color = Color3.fromRGB(0, 255, 80)  -- зелёный
+            segment.Transparency = 0.5  -- полупрозрачный
+            segment.Size = Vector3.new(thickness, 0.1, (math.pi * 2 * radius) / segments + 0.2)
+            
+            -- Позиционируем сегмент по кругу
+            local x = math.cos(midAngle) * radius
+            local z = math.sin(midAngle) * radius
+            segment.CFrame = CFrame.new(x, -2.9, z) * CFrame.Angles(0, -midAngle + math.pi/2, 0)
+            
+            segment.Parent = base
         end
-        return false
+        
+        pcall(function() base.Parent = workspace end)
+        return base
     end
 
     local function updateVisual()
@@ -2507,11 +2515,49 @@ local ParryCircleVisual = (function()
         if not circleObj or not circleObj.Parent then
             circleObj = createCircle()
         end
-        local r = AutoParry.GetRange()
-        circleObj.Size = Vector3.new(r * 2, 0.05, r * 2)
-        circleObj.CFrame = CFrame.new(myRoot.Position.X, myRoot.Position.Y - 2.9, myRoot.Position.Z)
-        -- кружок всегда остаётся зелёным
-        circleObj.Color = Color3.fromRGB(0, 255, 80)
+        
+        -- Обновляем позицию и размер
+        if circleObj and circleObj.Parent then
+            local r = AutoParry.GetRange()
+            
+            -- Удаляем старые сегменты
+            for _, child in ipairs(circleObj:GetChildren()) do
+                if child.Name == "Segment" then
+                    child:Destroy()
+                end
+            end
+            
+            -- Пересоздаём сегменты с новым радиусом
+            local segments = 80
+            local thickness = 0.15
+            
+            for i = 1, segments do
+                local angle1 = (i - 1) / segments * math.pi * 2
+                local angle2 = i / segments * math.pi * 2
+                
+                local midAngle = (angle1 + angle2) / 2
+                
+                local segment = Instance.new("Part")
+                segment.Name = "Segment"
+                segment.Anchored = true
+                segment.CanCollide = false
+                segment.CanTouch = false
+                segment.CastShadow = false
+                segment.Material = Enum.Material.SmoothPlastic
+                segment.Color = Color3.fromRGB(0, 255, 80)
+                segment.Transparency = 0.5
+                segment.Size = Vector3.new(thickness, 0.1, (math.pi * 2 * r) / segments + 0.2)
+                
+                local x = math.cos(midAngle) * r
+                local z = math.sin(midAngle) * r
+                segment.CFrame = CFrame.new(x, -2.9, z) * CFrame.Angles(0, -midAngle + math.pi/2, 0)
+                
+                segment.Parent = circleObj
+            end
+            
+            -- Обновляем позицию
+            circleObj.CFrame = CFrame.new(myRoot.Position.X, myRoot.Position.Y, myRoot.Position.Z)
+        end
     end
 
     local function startLoop()
