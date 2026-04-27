@@ -2448,61 +2448,90 @@ local ParryCircleVisual = (function()
     local circleObj = nil
     local connection = nil
     local teamListeners = {}
+    local billboardGui = nil
+    local textLabel = nil
 
     local function destroyCircle()
         if circleObj then
             pcall(function() circleObj:Destroy() end)
             circleObj = nil
         end
+        billboardGui = nil
+        textLabel = nil
+    end
+
+    local function getDistanceToNearestKiller()
+        local character = Nexus.getCharacter()
+        if not character then return math.huge end
+        
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return math.huge end
+        
+        local myPos = root.Position
+        local closestDist = math.huge
+        
+        for _, player in ipairs(Nexus.Services.Players:GetPlayers()) do
+            if player ~= Nexus.Player and player.Character then
+                local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                local targetHum = player.Character:FindFirstChildOfClass("Humanoid")
+                
+                if targetRoot and targetHum and targetHum.Health > 0 then
+                    -- Проверяем, что игрок в команде Killer
+                    local isKiller = false
+                    if player.Team then
+                        local teamName = player.Team.Name:lower()
+                        isKiller = teamName:find("killer") ~= nil
+                    end
+                    
+                    if isKiller then
+                        local dist = (targetRoot.Position - myPos).Magnitude
+                        if dist < closestDist then
+                            closestDist = dist
+                        end
+                    end
+                end
+            end
+        end
+        
+        return closestDist
     end
 
     local function createCircle()
         destroyCircle()
         
-        -- Создаём основу (невидимую) для позиционирования
-        local base = Instance.new("Part")
-        base.Name = "NexusParryCircle"
-        base.Anchored = true
-        base.CanCollide = false
-        base.CanTouch = false
-        base.CastShadow = false
-        base.Transparency = 1  -- полностью невидимая основа
-        base.Size = Vector3.new(1, 1, 1)
+        -- Создаём цилиндр
+        local dome = Instance.new("Part")
+        dome.Name = "NexusParryCircle"
+        dome.Anchored = true
+        dome.CanCollide = false
+        dome.CastShadow = false
+        dome.Material = Enum.Material.Neon
+        dome.Color = Color3.fromRGB(0, 255, 80)  -- зелёный
+        dome.Transparency = 0.55  -- полупрозрачный
+        dome.Shape = Enum.PartType.Cylinder  -- форма цилиндра
+        dome.Parent = workspace
         
-        -- Создаём множество маленьких сегментов для формирования кольца
-        local segments = 80  -- количество сегментов (больше = плавнее круг)
-        local radius = AutoParry.GetRange()
-        local thickness = 0.15
+        -- Создаём BillboardGui для текста
+        local bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.new(0, 200, 0, 32)
+        bb.StudsOffset = Vector3.new(0, 4, 0)
+        bb.AlwaysOnTop = true
+        bb.Parent = dome
         
-        for i = 1, segments do
-            local angle1 = (i - 1) / segments * math.pi * 2
-            local angle2 = i / segments * math.pi * 2
-            
-            -- Средний угол для позиции сегмента
-            local midAngle = (angle1 + angle2) / 2
-            
-            -- Создаём сегмент
-            local segment = Instance.new("Part")
-            segment.Name = "Segment"
-            segment.Anchored = true
-            segment.CanCollide = false
-            segment.CanTouch = false
-            segment.CastShadow = false
-            segment.Material = Enum.Material.SmoothPlastic
-            segment.Color = Color3.fromRGB(0, 255, 80)  -- зелёный
-            segment.Transparency = 0.5  -- полупрозрачный
-            segment.Size = Vector3.new(thickness, 0.1, (math.pi * 2 * radius) / segments + 0.2)
-            
-            -- Позиционируем сегмент по кругу
-            local x = math.cos(midAngle) * radius
-            local z = math.sin(midAngle) * radius
-            segment.CFrame = CFrame.new(x, -2.9, z) * CFrame.Angles(0, -midAngle + math.pi/2, 0)
-            
-            segment.Parent = base
-        end
+        local lbl = Instance.new("TextLabel", bb)
+        lbl.Size = UDim2.new(1, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.TextColor3 = Color3.fromRGB(0, 255, 80)
+        lbl.TextStrokeTransparency = 0
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 14
+        lbl.Text = "Parry Distance"
         
-        pcall(function() base.Parent = workspace end)
-        return base
+        circleObj = dome
+        billboardGui = bb
+        textLabel = lbl
+        
+        return dome
     end
 
     local function updateVisual()
@@ -2510,53 +2539,54 @@ local ParryCircleVisual = (function()
             destroyCircle()
             return
         end
-        local myRoot = Nexus.getRootPart()
-        if not myRoot then return end
+        
+        local character = Nexus.getCharacter()
+        if not character then return end
+        
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        -- Создаём круг, если его нет
         if not circleObj or not circleObj.Parent then
             circleObj = createCircle()
         end
         
-        -- Обновляем позицию и размер
-        if circleObj and circleObj.Parent then
-            local r = AutoParry.GetRange()
+        if not circleObj or not circleObj.Parent then return end
+        
+        -- Получаем радиус из AutoParry
+        local maxDist = 10  -- стандартный радиус
+        if AutoParry and AutoParry.GetRange then
+            maxDist = AutoParry.GetRange()
+        end
+        
+        -- Получаем дистанцию до ближайшего киллера
+        local killerDist = getDistanceToNearestKiller()
+        
+        -- Размер цилиндра (диаметр = радиус * 2)
+        local diam = maxDist * 2
+        
+        -- Позиционируем под ногами игрока (на 3 юнита ниже)
+        local floorY = root.Position.Y - 2.9
+        circleObj.CFrame = CFrame.new(root.Position.X, floorY, root.Position.Z) * CFrame.Angles(0, 0, math.pi / 2)
+        circleObj.Size = Vector3.new(0.2, diam, diam)
+        
+        -- Меняем цвет в зависимости от дистанции до киллера
+        if killerDist <= maxDist then
+            circleObj.Color = Color3.fromRGB(255, 50, 50)  -- красный если киллер в радиусе
+        else
+            circleObj.Color = Color3.fromRGB(0, 255, 80)  -- зелёный если киллер далеко
+        end
+        
+        -- Обновляем текст
+        if textLabel then
+            local distStr = (killerDist == math.huge) and "---" or string.format("%.1f", killerDist)
+            textLabel.Text = string.format("r: %.1f  |  killer: %s", maxDist, distStr)
             
-            -- Удаляем старые сегменты
-            for _, child in ipairs(circleObj:GetChildren()) do
-                if child.Name == "Segment" then
-                    child:Destroy()
-                end
+            if killerDist <= maxDist then
+                textLabel.TextColor3 = Color3.fromRGB(255, 80, 80)  -- красный текст
+            else
+                textLabel.TextColor3 = Color3.fromRGB(0, 255, 80)  -- зелёный текст
             end
-            
-            -- Пересоздаём сегменты с новым радиусом
-            local segments = 80
-            local thickness = 0.15
-            
-            for i = 1, segments do
-                local angle1 = (i - 1) / segments * math.pi * 2
-                local angle2 = i / segments * math.pi * 2
-                
-                local midAngle = (angle1 + angle2) / 2
-                
-                local segment = Instance.new("Part")
-                segment.Name = "Segment"
-                segment.Anchored = true
-                segment.CanCollide = false
-                segment.CanTouch = false
-                segment.CastShadow = false
-                segment.Material = Enum.Material.SmoothPlastic
-                segment.Color = Color3.fromRGB(0, 255, 80)
-                segment.Transparency = 0.5
-                segment.Size = Vector3.new(thickness, 0.1, (math.pi * 2 * r) / segments + 0.2)
-                
-                local x = math.cos(midAngle) * r
-                local z = math.sin(midAngle) * r
-                segment.CFrame = CFrame.new(x, -2.9, z) * CFrame.Angles(0, -midAngle + math.pi/2, 0)
-                
-                segment.Parent = circleObj
-            end
-            
-            -- Обновляем позицию
-            circleObj.CFrame = CFrame.new(myRoot.Position.X, myRoot.Position.Y, myRoot.Position.Z)
         end
     end
 
@@ -2571,17 +2601,20 @@ local ParryCircleVisual = (function()
         if enabled then return end
         enabled = true
         Nexus.States.ParryCircleEnabled = true
+        
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
             else Nexus.safeDisconnect(listener) end
         end
         teamListeners = {}
+        
         table.insert(teamListeners, setupTeamListener(function()
             if connection then connection:Disconnect(); connection = nil end
             destroyCircle()
             startLoop()
         end))
+        
         startLoop()
     end
 
@@ -2589,8 +2622,10 @@ local ParryCircleVisual = (function()
         if not enabled then return end
         enabled = false
         Nexus.States.ParryCircleEnabled = false
+        
         if connection then connection:Disconnect(); connection = nil end
         destroyCircle()
+        
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do Nexus.safeDisconnect(conn) end
