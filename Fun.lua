@@ -17,7 +17,6 @@ local Fun = {
 
 function Fun.Init(nxs)
     Nexus = nxs
-    
     local Tabs = Nexus.Tabs
     
     local emotesInitialized = Fun.InitializeEmotesSystem()
@@ -44,38 +43,30 @@ function Fun.Init(nxs)
         })
         
         SelectedEmote:OnChanged(function(value) 
-            Nexus.SafeCallback(function()
-                if value and value ~= "" and value ~= "--" then 
-                    if value == "Jerk" then
-                        Fun.StartJerk()
-                    else
-                        Fun.PlayEmote(value) 
-                    end
-                    
-                    task.wait(0.1)
-                    SelectedEmote:SetValue("--")
-                end 
-            end)
+            if value and value ~= "--" then 
+                if value == "Jerk" then
+                    Fun.StartJerk()
+                else
+                    Fun.PlayEmote(value) 
+                end
+                task.wait(0.1)
+                SelectedEmote:SetValue("--")
+            end 
         end)
 
         Tabs.Fun:AddButton({
             Title = "Stop Current Emote", 
             Description = "Stops the currently playing emote", 
             Callback = function()
-                Nexus.SafeCallback(Fun.StopEmote)
+                Fun.StopEmote()
             end
         })
     else
-        Tabs.Fun:AddParagraph({
-            Title = "Fun Tools",
-            Content = "Additional fun tools for the game"
-        })
-        
         Tabs.Fun:AddButton({
             Title = "Jerk Tool", 
             Description = "Adds Jerk Off tool to your backpack", 
             Callback = function()
-                Nexus.SafeCallback(Fun.StartJerk)
+                Fun.StartJerk()
             end
         })
     end
@@ -86,7 +77,7 @@ function Fun.Init(nxs)
         Title = "Reset Character", 
         Description = "Kills your character to respawn", 
         Callback = function()
-            Nexus.SafeCallback(Fun.ResetCharacter)
+            Fun.ResetCharacter()
         end
     })
     
@@ -94,7 +85,7 @@ function Fun.Init(nxs)
         Title = "Rejoin Game", 
         Description = "Rejoins the current game server", 
         Callback = function()
-            Nexus.SafeCallback(Fun.RejoinGame)
+            Fun.RejoinGame()
         end
     })
     
@@ -102,7 +93,7 @@ function Fun.Init(nxs)
         Title = "Server Hop", 
         Description = "Joins a new random server", 
         Callback = function()
-            Nexus.SafeCallback(Fun.ServerHop)
+            Fun.ServerHop()
         end
     })
     
@@ -112,7 +103,7 @@ function Fun.Init(nxs)
         Title = "Suicide", 
         Description = "Instantly kills your character", 
         Callback = function()
-            Nexus.SafeCallback(Fun.Suicide)
+            Fun.Suicide()
         end
     })
     
@@ -122,7 +113,7 @@ function Fun.Init(nxs)
         Title = "Fling Nearest Player",
         Description = "Launches the closest player into the air",
         Callback = function()
-            Nexus.SafeCallback(Fun.FlingNearest)
+            Fun.FlingNearest()
         end
     })
 
@@ -132,9 +123,7 @@ function Fun.Init(nxs)
         Default = false
     })
     AutoFlingToggle:OnChanged(function(v)
-        Nexus.SafeCallback(function()
-            if v then Fun.StartAutoFling() else Fun.StopAutoFling() end
-        end)
+        if v then Fun.StartAutoFling() else Fun.StopAutoFling() end
     end)
 
     local SpinToggle = Tabs.Fun:AddToggle("SpinCharacter", {
@@ -144,9 +133,7 @@ function Fun.Init(nxs)
     })
     
     SpinToggle:OnChanged(function(v)
-        Nexus.SafeCallback(function()
-            Fun.ToggleSpin(v)
-        end)
+        Fun.ToggleSpin(v)
     end)
 end
 
@@ -164,34 +151,23 @@ function Fun.InitializeEmotesSystem()
         end
     end
     
-    if #Fun.AvailableEmotes == 0 then
-        return false
-    end
-    
     table.sort(Fun.AvailableEmotes)
-    return true
+    return #Fun.AvailableEmotes > 0
 end
 
 function Fun.PlayEmote(emoteName)
     Fun.StopEmote()
     
     local emoteFolder = Fun.EmotesFolder:FindFirstChild(emoteName)
-    if not emoteFolder then 
-        return false 
-    end
+    if not emoteFolder then return end
     
     local animationId = emoteFolder:GetAttribute("animationid")
     local soundId = emoteFolder:GetAttribute("Song")
-    
-    if not animationId then 
-        return false 
-    end
+    if not animationId then return end
     
     local character = Nexus.getCharacter()
     local humanoid = Nexus.getHumanoid()
-    if not character or not humanoid then 
-        return false 
-    end
+    if not character or not humanoid then return end
     
     local animation = Instance.new("Animation")
     animation.AnimationId = animationId
@@ -222,8 +198,6 @@ function Fun.PlayEmote(emoteName)
     humanoid.Died:Connect(function()
         Fun.StopEmote()
     end)
-    
-    return true
 end
 
 function Fun.StopEmote()
@@ -242,108 +216,65 @@ function Fun.StopEmote()
 end
 
 function Fun.StartJerk()
-    Nexus.SafeCallback(function()
-        local humanoid = Nexus.getHumanoid()
-        local backpack = Nexus.Player:FindFirstChildWhichIsA("Backpack")
-        if not humanoid or not backpack then 
-            return 
+    local humanoid = Nexus.getHumanoid()
+    local backpack = Nexus.Player:FindFirstChildWhichIsA("Backpack")
+    if not humanoid or not backpack then return end
+    
+    if Fun.JerkTool.tool and Fun.JerkTool.tool.Parent then
+        Fun.StopJerk()
+        return
+    end
+    
+    local tool = Instance.new("Tool")
+    tool.Name = "Jerk Off"
+    tool.RequiresHandle = false
+    tool.Parent = backpack
+    
+    Fun.JerkTool.tool = tool
+    
+    local function playAnimation()
+        local currentHumanoid = Nexus.getHumanoid()
+        if not currentHumanoid or currentHumanoid.Health <= 0 then return end
+        
+        local isR15 = currentHumanoid.RigType == Enum.HumanoidRigType.R15
+        
+        if Fun.JerkTool.track then
+            Fun.JerkTool.track:Stop()
         end
-
-        if Fun.JerkTool.tool and Fun.JerkTool.tool.Parent then
-            Fun.StopJerk()
-            return
+        
+        local animation = Instance.new("Animation")
+        animation.AnimationId = isR15 and "rbxassetid://698251653" or "rbxassetid://72042024"
+        
+        local track = currentHumanoid:LoadAnimation(animation)
+        Fun.JerkTool.track = track
+        track.Looped = true
+        track:Play()
+        track:AdjustSpeed(isR15 and 0.7 or 0.65)
+    end
+    
+    tool.Equipped:Connect(playAnimation)
+    tool.Unequipped:Connect(function()
+        if Fun.JerkTool.track then
+            Fun.JerkTool.track:Stop()
         end
-
-        local tool = Instance.new("Tool")
-        tool.Name = "Jerk Off"
-        tool.ToolTip = "Jerk animation"
-        tool.RequiresHandle = false
-        tool.Parent = backpack
-
-        Fun.JerkTool.tool = tool
-        Fun.JerkTool.active = false
-        Fun.JerkTool.track = nil
-
-        local function startJerkAnimation()
-            if Fun.JerkTool.active then return end
-            
-            Fun.JerkTool.active = true
-            
-            local character = Nexus.getCharacter()
-            local currentHumanoid = Nexus.getHumanoid()
-            if not character or not currentHumanoid or currentHumanoid.Health <= 0 then 
-                Fun.JerkTool.active = false
-                return 
-            end
-            
-            local isR15 = false
-            if currentHumanoid:FindFirstChild("RigType") then
-                isR15 = currentHumanoid.RigType == Enum.HumanoidRigType.R15
-            end
-            
-            if Fun.JerkTool.track then
-                Fun.JerkTool.track:Stop()
-                Fun.JerkTool.track = nil
-            end
-            
-            local animation = Instance.new("Animation")
-            animation.AnimationId = isR15 and "rbxassetid://698251653" or "rbxassetid://72042024"
-            
-            local track = currentHumanoid:LoadAnimation(animation)
-            if track then
-                Fun.JerkTool.track = track
-                track.Looped = true
-                track:Play()
-                track:AdjustSpeed(isR15 and 0.7 or 0.65)
-            end
-        end
-
-        local function stopJerkAnimation()
-            if Fun.JerkTool.track then
-                Fun.JerkTool.track:Stop()
-                Fun.JerkTool.track = nil
-            end
-            Fun.JerkTool.active = false
-        end
-
-        startJerkAnimation()
-
-        tool.Unequipped:Connect(function()
-            stopJerkAnimation()
-        end)
-
-        tool.Equipped:Connect(function()
-            startJerkAnimation()
-        end)
-
-        local deathConnection
-        deathConnection = humanoid.Died:Connect(function()
-            stopJerkAnimation()
-        end)
-
-        local characterAddedConnection
-        characterAddedConnection = Nexus.Player.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            if Fun.JerkTool.tool and Fun.JerkTool.tool.Parent then
-                Fun.StopJerk()
-            end
-        end)
-
-        tool.AncestryChanged:Connect(function(_, parent)
-            if not parent then
-                if deathConnection then
-                    deathConnection:Disconnect()
-                end
-                if characterAddedConnection then
-                    characterAddedConnection:Disconnect()
-                end
-                stopJerkAnimation()
-                if tool == Fun.JerkTool.tool then
-                    Fun.JerkTool.tool = nil
-                end
-            end
-        end)
     end)
+    
+    humanoid.Died:Connect(function()
+        if Fun.JerkTool.tool then
+            Fun.StopJerk()
+        end
+    end)
+    
+    tool.AncestryChanged:Connect(function(_, parent)
+        if not parent and Fun.JerkTool.tool == tool then
+            if Fun.JerkTool.track then
+                Fun.JerkTool.track:Stop()
+            end
+            Fun.JerkTool.tool = nil
+        end
+    end)
+    
+    playAnimation()
 end
 
 function Fun.StopJerk()
@@ -352,8 +283,6 @@ function Fun.StopJerk()
         Fun.JerkTool.track = nil
     end
     
-    Fun.JerkTool.active = false
-    
     if Fun.JerkTool.tool then
         Fun.JerkTool.tool:Destroy()
         Fun.JerkTool.tool = nil
@@ -361,41 +290,26 @@ function Fun.StopJerk()
 end
 
 function Fun.ResetCharacter()
-    local character = Nexus.getCharacter()
-    if character then
-        local humanoid = Nexus.getHumanoid()
-        if humanoid then
-            humanoid.Health = 0
-        end
+    local humanoid = Nexus.getHumanoid()
+    if humanoid then
+        humanoid.Health = 0
     end
 end
 
 function Fun.RejoinGame()
     local TeleportService = game:GetService("TeleportService")
-    local placeId = game.PlaceId
-    local jobId = game.JobId
-    
-    if placeId and jobId then
-        TeleportService:TeleportToPlaceInstance(placeId, jobId, Nexus.Player)
-    end
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Nexus.Player)
 end
 
 function Fun.ServerHop()
     local TeleportService = game:GetService("TeleportService")
-    local placeId = game.PlaceId
-    
-    pcall(function()
-        TeleportService:Teleport(placeId, Nexus.Player)
-    end)
+    TeleportService:Teleport(game.PlaceId, Nexus.Player)
 end
 
 function Fun.Suicide()
-    local character = Nexus.getCharacter()
-    if character then
-        local humanoid = Nexus.getHumanoid()
-        if humanoid then
-            humanoid.Health = 0
-        end
+    local humanoid = Nexus.getHumanoid()
+    if humanoid then
+        humanoid.Health = 0
     end
 end
 
@@ -533,5 +447,5 @@ function Fun.Cleanup()
         Fun.StopJerk()
     end
 end
---а 
+
 return Fun
