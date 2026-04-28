@@ -1175,6 +1175,167 @@ local AutoParry = (function()
     }
 end)()
 
+-- AUTOPARRY V2 --
+
+local AutoParryV2 = (function()
+    local enabled = false
+    local DETECT_RADIUS = 11
+    local SWING_THRESHOLD = 0.05
+    local ACCEL_THRESHOLD = 0.5
+    local CLICK_HOLD = 0
+    local COOLDOWN = 0
+    local CHECK_RATE = 0.1
+    local teamListeners = {}
+    local connection = nil
+    local lastArmPos = nil
+    local lastDelta = 0
+    local lastCheckTime = 0
+    local onCooldown = false
+
+    local function isKillerTeam(player)
+        local team = player.Team
+        if not team then return false end
+        local name = team.Name:lower()
+        return name == "killer" or name == "killers" or name == "Killer Team" or name == "Killer"
+    end
+
+    local function getTarget()
+        local localChar = Nexus.Player.Character
+        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+        if not localRoot then return nil end
+
+        local nearest, nearestDist = nil, math.huge
+        for _, player in ipairs(Nexus.Services.Players:GetPlayers()) do
+            if player ~= Nexus.Player and player.Character and isKillerTeam(player) then
+                local root = player.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local dist = (root.Position - localRoot.Position).Magnitude
+                    if dist < nearestDist then
+                        nearestDist = dist
+                        nearest = player
+                    end
+                end
+            end
+        end
+        return nearest
+    end
+
+    local function getRightArm(character)
+        if not character then return nil end
+        return character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")
+    end
+
+    local function clickRMB()
+        local x = workspace.CurrentCamera.ViewportSize.X / 2
+        local y = workspace.CurrentCamera.ViewportSize.Y / 2
+        Nexus.Services.VirtualInputManager:SendMouseButtonEvent(x, y, 1, true, game, 1)
+        task.delay(CLICK_HOLD, function()
+            Nexus.Services.VirtualInputManager:SendMouseButtonEvent(x, y, 1, false, game, 1)
+        end)
+    end
+
+    local function updateLoop()
+        if not enabled or not isSurvivorTeam() then return end
+
+        local now = tick()
+        if now - lastCheckTime < CHECK_RATE then return end
+        lastCheckTime = now
+
+        local target = getTarget()
+        if not target or not target.Character then
+            lastArmPos = nil
+            return
+        end
+
+        local localChar = Nexus.Player.Character
+        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+        if not localRoot or not targetRoot then
+            lastArmPos = nil
+            return
+        end
+        if (targetRoot.Position - localRoot.Position).Magnitude > DETECT_RADIUS then
+            lastArmPos = nil
+            return
+        end
+
+        local arm = getRightArm(target.Character)
+        if not arm then
+            lastArmPos = nil
+            return
+        end
+
+        local currentPos = arm.Position
+
+        if lastArmPos then
+            local delta = (currentPos - lastArmPos).Magnitude
+            local accel = delta - lastDelta
+            if delta > SWING_THRESHOLD and accel > ACCEL_THRESHOLD and not onCooldown then
+                onCooldown = true
+                clickRMB()
+                task.delay(COOLDOWN, function()
+                    onCooldown = false
+                end)
+            end
+            lastDelta = delta
+        else
+            lastDelta = 0
+        end
+
+        lastArmPos = currentPos
+    end
+
+    local function Enable()
+        if enabled then return end
+        enabled = true
+        Nexus.States.AutoParryV2Enabled = true
+
+        for _, listener in ipairs(teamListeners) do
+            Nexus.safeDisconnect(listener)
+        end
+        teamListeners = {}
+
+        table.insert(teamListeners, setupTeamListener(function()
+            if enabled and isSurvivorTeam() then
+                connection = Nexus.Services.RunService.Heartbeat:Connect(updateLoop)
+            else
+                if connection then
+                    connection:Disconnect()
+                    connection = nil
+                end
+            end
+        end))
+
+        if isSurvivorTeam() then
+            connection = Nexus.Services.RunService.Heartbeat:Connect(updateLoop)
+        end
+    end
+
+    local function Disable()
+        enabled = false
+        Nexus.States.AutoParryV2Enabled = false
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        for _, listener in ipairs(teamListeners) do
+            Nexus.safeDisconnect(listener)
+        end
+        teamListeners = {}
+        lastArmPos = nil
+    end
+
+    local function SetRadius(value)
+        DETECT_RADIUS = tonumber(value) or 11
+    end
+
+    return {
+        Enable = Enable,
+        Disable = Disable,
+        SetRadius = SetRadius
+    }
+end)()
+
 --  FAKE PARRY --
 
 local FakeParry = (function()
@@ -2788,6 +2949,36 @@ function Survivor.Init(nxs)
         end
     })
 
+    local AutoParryV2Toggle = Tabs.Main:AddToggle("AutoParryV2", {
+        Title = "AutoParry V2", 
+        Description = "Arm detection based parry", 
+        Default = false
+    })
+
+    AutoParryV2Toggle:OnChanged(function(v) 
+        Nexus.SafeCallback(function()
+            if v then 
+                AutoParryV2.Enable() 
+            else 
+                AutoParryV2.Disable() 
+            end 
+        end)
+    end)
+
+    local AutoParryV2RangeSlider = Tabs.Main:AddSlider("AutoParryV2Range", {
+        Title = "AutoParry V2 Distance",
+        Description = "",
+        Default = 11,
+        Min = 0,
+        Max = 15,
+        Rounding = 2,
+        Callback = function(value)
+            Nexus.SafeCallback(function()
+                AutoParryV2.SetRadius(value)
+            end)
+        end
+    })
+
     local ParryCircleToggle = Tabs.Main:AddToggle("ParryCircleVisual", {
         Title = "Visual Parry Distance",
         Description = "Shows parry range circle: green = safe, red = killer in range",
@@ -3105,6 +3296,7 @@ function Survivor.Cleanup()
     AutoVictoryV2.Disable()
     NoSlowdown.Disable()
     AutoParry.Disable()
+    AutoParryV2.Disable()
     FakeParry.Disable()
     NoFall.Disable()  
     Gamemode.Disable()
