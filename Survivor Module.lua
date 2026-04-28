@@ -1179,12 +1179,13 @@ end)()
 
 local AutoParryV2 = (function()
     local enabled = false
-    local DETECT_RADIUS = 11
-    local SWING_THRESHOLD = 0.05
-    local ACCEL_THRESHOLD = 0.5
-    local CLICK_HOLD = 0
-    local COOLDOWN = 0
-    local CHECK_RATE = 0.1
+local DETECT_RADIUS = 20      -- Радиус обнаружения игроков (studs)
+local SWING_THRESHOLD = 0.01  -- Минимальная скорость движения руки за тик для срабатывания (studs/tick)
+local ACCEL_THRESHOLD = 0.3   -- Минимальное ускорение (резкость замаха) для срабатывания
+local CLICK_HOLD = 0.1       -- Сколько секунд удерживать ПКМ
+local COOLDOWN = 0.5           -- Пауза между нажатиями (секунды)
+local CHECK_RATE = 0.05 
+local VIEW_ANGLE_THRESHOLD = 90 -- Максимальный угол (градусы) для проверки направления взгляда Killer'а
     local teamListeners = {}
     local connection = nil
     local lastArmPos = nil
@@ -1259,6 +1260,16 @@ local AutoParryV2 = (function()
             return
         end
 
+        -- Проверка направления взгляда Killer'а
+        local directionToSurvivor = (localRoot.Position - targetRoot.Position).Unit
+        local lookVector = targetRoot.CFrame.LookVector
+        local dotProduct = lookVector:Dot(directionToSurvivor)
+        local angle = math.acos(math.clamp(dotProduct, -1, 1)) * 180 / math.pi
+        if angle > VIEW_ANGLE_THRESHOLD then
+            lastArmPos = nil
+            return
+        end
+
         local arm = getRightArm(target.Character)
         if not arm then
             lastArmPos = nil
@@ -1326,7 +1337,7 @@ local AutoParryV2 = (function()
     end
 
     local function SetRadius(value)
-        DETECT_RADIUS = tonumber(value) or 11
+        DETECT_RADIUS = tonumber(value) or 20
     end
 
     return {
@@ -2968,10 +2979,10 @@ function Survivor.Init(nxs)
     local AutoParryV2RangeSlider = Tabs.Main:AddSlider("AutoParryV2Range", {
         Title = "AutoParry V2 Distance",
         Description = "",
-        Default = 11,
+        Default = 20,
         Min = 0,
-        Max = 15,
-        Rounding = 2,
+        Max = 30,
+        Rounding = 1,
         Callback = function(value)
             Nexus.SafeCallback(function()
                 AutoParryV2.SetRadius(value)
